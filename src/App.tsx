@@ -1,12 +1,15 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useState } from 'react'
 import {
+  fetchCommentReplies,
   fetchExploreFeed,
   fetchFollowingFeed,
   fetchHashtagFeed,
+  fetchPost,
+  fetchPostComments,
   fetchProfilePosts,
   searchPosts,
 } from './api/adapters'
-import type { ReportReason, UiFeedPage, UiPost } from './api/adapters'
+import type { ReportReason, UiComment, UiCommentPage, UiFeedPage, UiPost } from './api/adapters'
 import { useSocialInteractions } from './social/useSocialInteractions'
 import type { SocialRequestState } from './social/useSocialInteractions'
 import './App.css'
@@ -33,6 +36,20 @@ type FeedLoadState = {
   requestId: string | null
 }
 
+type PostDetailState = {
+  status: 'idle' | 'loading' | 'ready' | 'error'
+  post: UiPost | null
+  error: string | null
+  requestId: string | null
+}
+
+type CommentPageState = {
+  status: 'idle' | 'loading' | 'ready' | 'error'
+  page: UiCommentPage
+  error: string | null
+  requestId: string | null
+}
+
 type CreatePostDraft = {
   caption: string
   mediaIds: string
@@ -48,6 +65,12 @@ type ReportDraft = {
 
 const EMPTY_FEED_PAGE: UiFeedPage = {
   posts: [],
+  nextCursor: null,
+  hasMore: false,
+}
+
+const EMPTY_COMMENT_PAGE: UiCommentPage = {
+  items: [],
   nextCursor: null,
   hasMore: false,
 }
@@ -69,6 +92,24 @@ function defaultFeedState(): FeedLoadState {
   return {
     status: 'idle',
     page: EMPTY_FEED_PAGE,
+    error: null,
+    requestId: null,
+  }
+}
+
+function defaultPostDetailState(): PostDetailState {
+  return {
+    status: 'idle',
+    post: null,
+    error: null,
+    requestId: null,
+  }
+}
+
+function defaultCommentPageState(): CommentPageState {
+  return {
+    status: 'idle',
+    page: EMPTY_COMMENT_PAGE,
     error: null,
     requestId: null,
   }
@@ -128,6 +169,19 @@ function normalizeHashtags(value: string): string[] {
     .filter((tag) => tag.length > 0)
 }
 
+function formatTimestamp(value: string | null): string {
+  if (!value) {
+    return 'unknown time'
+  }
+
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) {
+    return value
+  }
+
+  return parsed.toLocaleString()
+}
+
 function SurfaceButton({
   active,
   label,
@@ -176,27 +230,27 @@ function ActionStateBadge({ state }: { state: SocialRequestState }) {
 
 function PostCard({
   post,
+  isSensitive,
+  reportScore,
   isSensitiveRevealed,
-  isCommentRevealed,
   onRevealSensitive,
-  onRevealComment,
   selected,
   onSelect,
   viewerHasLiked,
   viewerFollowsAuthor,
 }: {
   post: UiPost
+  isSensitive: boolean
+  reportScore: number
   isSensitiveRevealed: boolean
-  isCommentRevealed: (commentId: string) => boolean
   onRevealSensitive: (postId: string) => void
-  onRevealComment: (commentId: string) => void
   selected: boolean
   onSelect: (postId: string) => void
   viewerHasLiked: boolean
   viewerFollowsAuthor: boolean
 }) {
   const imageUrl = post.imageUrls[0] ?? null
-  const shouldBlur = post.isSensitive && !isSensitiveRevealed
+  const shouldBlur = isSensitive && !isSensitiveRevealed
 
   return (
     <article className={`post-card${selected ? ' is-selected' : ''}`}>
@@ -233,40 +287,12 @@ function PostCard({
         <div className="post-stats-row">
           <span>{post.likeCount} likes</span>
           <span>{post.commentCount} comments</span>
+          <span>report score: {reportScore.toFixed(2)}</span>
           <span>{viewerHasLiked ? 'You liked this' : 'Not liked yet'}</span>
           <span>{viewerFollowsAuthor ? 'Following author' : 'Not following author'}</span>
         </div>
 
-        {post.comments.length > 0 ? (
-          <ul className="comment-list">
-            {post.comments.slice(0, 3).map((comment) => {
-              const isHidden = comment.isHiddenByPostOwner && !isCommentRevealed(comment.id)
-              return (
-                <li key={comment.id} className="comment-item">
-                  {isHidden ? (
-                    <>
-                      <span className="comment-tombstone">[hidden by post owner]</span>
-                      <button
-                        type="button"
-                        className="inline-button"
-                        onClick={() => onRevealComment(comment.id)}
-                      >
-                        View
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <strong>{comment.authorName || 'unknown-agent'}:</strong>{' '}
-                      <span>{comment.body || '[empty comment]'}</span>
-                    </>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
-        ) : (
-          <p className="no-comments">No comments yet.</p>
-        )}
+        <p className="no-comments">Created: {formatTimestamp(post.createdAt)}</p>
 
         <button
           type="button"
@@ -282,6 +308,7 @@ function PostCard({
 
 function App() {
   const [ageGatePassed, setAgeGatePassed] = useState<boolean>(() => wasAgeGateAcknowledged())
+  const [apiKeyInput, setApiKeyInput] = useState('')
   const [surface, setSurface] = useState<Surface>('explore')
   const [hashtag, setHashtag] = useState('clawgram')
   const [profileName, setProfileName] = useState('')
@@ -289,6 +316,7 @@ function App() {
   const [createPostDraft, setCreatePostDraft] = useState<CreatePostDraft>(DEFAULT_CREATE_POST_DRAFT)
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null)
   const [commentDraftByPostId, setCommentDraftByPostId] = useState<Record<string, string>>({})
+  const [replyParentByPostId, setReplyParentByPostId] = useState<Record<string, string>>({})
   const [reportDraftByPostId, setReportDraftByPostId] = useState<Record<string, ReportDraft>>({})
 
   const [feedStates, setFeedStates] = useState<Record<Surface, FeedLoadState>>({
@@ -304,126 +332,60 @@ function App() {
   )
   const [revealedCommentIds, setRevealedCommentIds] = useState<Set<string>>(() => new Set())
 
+  const [postDetailsById, setPostDetailsById] = useState<Record<string, PostDetailState>>({})
+  const [commentPagesByPostId, setCommentPagesByPostId] = useState<Record<string, CommentPageState>>({})
+  const [replyPagesByCommentId, setReplyPagesByCommentId] = useState<Record<string, CommentPageState>>(
+    {},
+  )
+
   const {
     createPostState,
     getLikeState,
     getCommentState,
     getFollowState,
     getReportState,
+    getHideCommentState,
+    getDeleteCommentState,
+    getDeletePostState,
     resolveLikedState,
     resolveFollowingState,
+    resolveCommentHiddenState,
+    resolveCommentDeletedState,
+    resolvePostSensitiveState,
+    resolvePostReportScore,
+    isPostDeleted,
     submitCreatePost,
     toggleLike,
     toggleFollow,
     submitComment,
+    toggleCommentHidden,
+    submitDeleteComment,
+    submitDeletePost,
     submitReport,
   } = useSocialInteractions()
 
-  const loadSurface = useCallback(
-    async (target: Surface) => {
-      setFeedStates((current) => ({
-        ...current,
-        [target]: {
-          ...current[target],
-          status: 'loading',
-          error: null,
-          requestId: null,
-        },
-      }))
-
-      let result
-
-      if (target === 'explore') {
-        result = await fetchExploreFeed({ limit: 20 })
-      } else if (target === 'following') {
-        result = await fetchFollowingFeed({ limit: 20 })
-      } else if (target === 'hashtag') {
-        const normalizedTag = hashtag.trim().replace(/^#/, '')
-        if (!normalizedTag) {
-          setFeedStates((current) => ({
-            ...current,
-            [target]: {
-              status: 'error',
-              page: EMPTY_FEED_PAGE,
-              error: 'Enter a hashtag to load this feed.',
-              requestId: null,
-            },
-          }))
-          return
-        }
-        result = await fetchHashtagFeed(normalizedTag, { limit: 20 })
-      } else if (target === 'profile') {
-        const normalizedName = profileName.trim()
-        if (!normalizedName) {
-          setFeedStates((current) => ({
-            ...current,
-            [target]: {
-              status: 'error',
-              page: EMPTY_FEED_PAGE,
-              error: 'Enter an agent name to load profile posts.',
-              requestId: null,
-            },
-          }))
-          return
-        }
-        result = await fetchProfilePosts(normalizedName, { limit: 20 })
-      } else {
-        const normalizedSearch = searchText.trim()
-        if (!normalizedSearch) {
-          setFeedStates((current) => ({
-            ...current,
-            [target]: {
-              status: 'error',
-              page: EMPTY_FEED_PAGE,
-              error: 'Enter a query to search posts.',
-              requestId: null,
-            },
-          }))
-          return
-        }
-        result = await searchPosts(normalizedSearch, 'posts')
-      }
-
-      if (!result.ok) {
-        setFeedStates((current) => ({
-          ...current,
-          [target]: {
-            status: 'error',
-            page: EMPTY_FEED_PAGE,
-            error: result.error,
-            requestId: result.requestId,
-          },
-        }))
-        return
-      }
-
-      setFeedStates((current) => ({
-        ...current,
-        [target]: {
-          status: 'ready',
-          page: result.data,
-          error: null,
-          requestId: result.requestId,
-        },
-      }))
-    },
-    [hashtag, profileName, searchText],
-  )
-
   const activeState = feedStates[surface]
-  const posts = activeState.page.posts
+  const posts = activeState.page.posts.filter((post) => !isPostDeleted(post.id))
 
   const focusedPostId =
     selectedPostId && posts.some((post) => post.id === selectedPostId)
       ? selectedPostId
       : posts[0]?.id ?? null
 
-  const focusedPost = useMemo(
-    () => posts.find((post) => post.id === focusedPostId) ?? null,
-    [posts, focusedPostId],
-  )
+  const focusedFeedPost = focusedPostId ? posts.find((post) => post.id === focusedPostId) ?? null : null
+  const focusedDetailState = focusedPostId
+    ? (postDetailsById[focusedPostId] ?? defaultPostDetailState())
+    : defaultPostDetailState()
+  const focusedCommentsState = focusedPostId
+    ? (commentPagesByPostId[focusedPostId] ?? defaultCommentPageState())
+    : defaultCommentPageState()
+  const focusedPost =
+    focusedDetailState.status === 'ready' && focusedDetailState.post
+      ? focusedDetailState.post
+      : focusedFeedPost
 
   const focusedCommentDraft = focusedPost ? (commentDraftByPostId[focusedPost.id] ?? '') : ''
+  const focusedReplyParent = focusedPost ? (replyParentByPostId[focusedPost.id] ?? '') : ''
   const focusedReportDraft = focusedPost
     ? (reportDraftByPostId[focusedPost.id] ?? DEFAULT_REPORT_DRAFT)
     : DEFAULT_REPORT_DRAFT
@@ -438,6 +400,256 @@ function App() {
   const focusedCommentState = getCommentState(focusedPost?.id ?? '')
   const focusedReportState = getReportState(focusedPost?.id ?? '')
   const focusedFollowState = getFollowState(focusedPost?.author.name ?? '')
+  const focusedDeletePostState = getDeletePostState(focusedPost?.id ?? '')
+
+  function updatePostAcrossViews(postId: string, updater: (post: UiPost) => UiPost): void {
+    setFeedStates((current) => {
+      const next = { ...current }
+      for (const key of Object.keys(next) as Surface[]) {
+        const surfaceState = next[key]
+        next[key] = {
+          ...surfaceState,
+          page: {
+            ...surfaceState.page,
+            posts: surfaceState.page.posts.map((post) => (post.id === postId ? updater(post) : post)),
+          },
+        }
+      }
+      return next
+    })
+
+    setPostDetailsById((current) => {
+      const detail = current[postId]
+      if (!detail || !detail.post) {
+        return current
+      }
+
+      return {
+        ...current,
+        [postId]: {
+          ...detail,
+          post: updater(detail.post),
+        },
+      }
+    })
+  }
+
+  async function loadPostDetail(postId: string): Promise<void> {
+    setPostDetailsById((current) => ({
+      ...current,
+      [postId]: {
+        ...defaultPostDetailState(),
+        status: 'loading',
+      },
+    }))
+
+    const result = await fetchPost(postId)
+    setPostDetailsById((current) => ({
+      ...current,
+      [postId]: result.ok
+        ? {
+            status: 'ready',
+            post: result.data,
+            error: null,
+            requestId: result.requestId,
+          }
+        : {
+            status: 'error',
+            post: null,
+            error: result.error,
+            requestId: result.requestId,
+          },
+    }))
+  }
+
+  async function loadPostComments(postId: string, cursor?: string): Promise<void> {
+    setCommentPagesByPostId((current) => ({
+      ...current,
+      [postId]: {
+        ...(current[postId] ?? defaultCommentPageState()),
+        status: 'loading',
+      },
+    }))
+
+    const result = await fetchPostComments(postId, {
+      limit: 25,
+      cursor,
+    })
+
+    setCommentPagesByPostId((current) => {
+      const existing = current[postId] ?? defaultCommentPageState()
+      if (!result.ok) {
+        return {
+          ...current,
+          [postId]: {
+            ...existing,
+            status: 'error',
+            error: result.error,
+            requestId: result.requestId,
+          },
+        }
+      }
+
+      return {
+        ...current,
+        [postId]: {
+          status: 'ready',
+          error: null,
+          requestId: result.requestId,
+          page: cursor
+            ? {
+                items: [...existing.page.items, ...result.data.items],
+                hasMore: result.data.hasMore,
+                nextCursor: result.data.nextCursor,
+              }
+            : result.data,
+        },
+      }
+    })
+  }
+
+  async function loadCommentReplies(commentId: string, cursor?: string): Promise<void> {
+    setReplyPagesByCommentId((current) => ({
+      ...current,
+      [commentId]: {
+        ...(current[commentId] ?? defaultCommentPageState()),
+        status: 'loading',
+      },
+    }))
+
+    const result = await fetchCommentReplies(commentId, {
+      limit: 25,
+      cursor,
+    })
+
+    setReplyPagesByCommentId((current) => {
+      const existing = current[commentId] ?? defaultCommentPageState()
+      if (!result.ok) {
+        return {
+          ...current,
+          [commentId]: {
+            ...existing,
+            status: 'error',
+            error: result.error,
+            requestId: result.requestId,
+          },
+        }
+      }
+
+      return {
+        ...current,
+        [commentId]: {
+          status: 'ready',
+          error: null,
+          requestId: result.requestId,
+          page: cursor
+            ? {
+                items: [...existing.page.items, ...result.data.items],
+                hasMore: result.data.hasMore,
+                nextCursor: result.data.nextCursor,
+              }
+            : result.data,
+        },
+      }
+    })
+  }
+
+  async function loadSurface(target: Surface): Promise<void> {
+    setFeedStates((current) => ({
+      ...current,
+      [target]: {
+        ...current[target],
+        status: 'loading',
+        error: null,
+        requestId: null,
+      },
+    }))
+
+    let result
+
+    if (target === 'explore') {
+      result = await fetchExploreFeed({ limit: 20 })
+    } else if (target === 'following') {
+      result = await fetchFollowingFeed({ limit: 20 }, { apiKey: apiKeyInput })
+    } else if (target === 'hashtag') {
+      const normalizedTag = hashtag.trim().replace(/^#/, '')
+      if (!normalizedTag) {
+        setFeedStates((current) => ({
+          ...current,
+          [target]: {
+            status: 'error',
+            page: EMPTY_FEED_PAGE,
+            error: 'Enter a hashtag to load this feed.',
+            requestId: null,
+          },
+        }))
+        return
+      }
+      result = await fetchHashtagFeed(normalizedTag, { limit: 20 })
+    } else if (target === 'profile') {
+      const normalizedName = profileName.trim()
+      if (!normalizedName) {
+        setFeedStates((current) => ({
+          ...current,
+          [target]: {
+            status: 'error',
+            page: EMPTY_FEED_PAGE,
+            error: 'Enter an agent name to load profile posts.',
+            requestId: null,
+          },
+        }))
+        return
+      }
+      result = await fetchProfilePosts(normalizedName, { limit: 20 })
+    } else {
+      const normalizedSearch = searchText.trim()
+      if (!normalizedSearch) {
+        setFeedStates((current) => ({
+          ...current,
+          [target]: {
+            status: 'error',
+            page: EMPTY_FEED_PAGE,
+            error: 'Enter a query to search posts.',
+            requestId: null,
+          },
+        }))
+        return
+      }
+      result = await searchPosts(normalizedSearch, 'posts')
+    }
+
+    if (!result.ok) {
+      setFeedStates((current) => ({
+        ...current,
+        [target]: {
+          status: 'error',
+          page: EMPTY_FEED_PAGE,
+          error: result.error,
+          requestId: result.requestId,
+        },
+      }))
+      return
+    }
+
+    setFeedStates((current) => ({
+      ...current,
+      [target]: {
+        status: 'ready',
+        page: result.data,
+        error: null,
+        requestId: result.requestId,
+      },
+    }))
+
+    const nextSelection = result.data.posts.some((post) => post.id === selectedPostId)
+      ? selectedPostId
+      : (result.data.posts[0]?.id ?? null)
+
+    setSelectedPostId(nextSelection)
+    if (nextSelection) {
+      await Promise.all([loadPostDetail(nextSelection), loadPostComments(nextSelection)])
+    }
+  }
 
   const handlePassAgeGate = () => {
     persistAgeGateAcknowledgement()
@@ -461,6 +673,11 @@ function App() {
     }
   }
 
+  const handleSelectPost = (postId: string) => {
+    setSelectedPostId(postId)
+    void Promise.all([loadPostDetail(postId), loadPostComments(postId)])
+  }
+
   const revealSensitivePost = (postId: string) => {
     setRevealedSensitivePostIds((current) => {
       const next = new Set(current)
@@ -478,16 +695,20 @@ function App() {
   }
 
   const handleCreatePost = async () => {
-    const result = await submitCreatePost({
-      caption: createPostDraft.caption,
-      mediaIds: splitCsv(createPostDraft.mediaIds),
-      hashtags: normalizeHashtags(createPostDraft.hashtags),
-      altText: createPostDraft.altText.trim() || undefined,
-      isSensitive: createPostDraft.isSensitive,
-    })
+    const result = await submitCreatePost(
+      {
+        caption: createPostDraft.caption,
+        mediaIds: splitCsv(createPostDraft.mediaIds),
+        hashtags: normalizeHashtags(createPostDraft.hashtags),
+        altText: createPostDraft.altText.trim() || undefined,
+        isSensitive: createPostDraft.isSensitive,
+      },
+      apiKeyInput,
+    )
 
     if (result.ok) {
       setCreatePostDraft(DEFAULT_CREATE_POST_DRAFT)
+      void loadSurface(surface)
     }
   }
 
@@ -496,7 +717,16 @@ function App() {
       return
     }
 
-    await toggleLike(focusedPost.id, focusedLiked)
+    const result = await toggleLike(focusedPost.id, focusedLiked, apiKeyInput)
+    if (!result.ok || result.data.liked === focusedLiked) {
+      return
+    }
+
+    const delta = result.data.liked ? 1 : -1
+    updatePostAcrossViews(focusedPost.id, (post) => ({
+      ...post,
+      likeCount: Math.max(0, post.likeCount + delta),
+    }))
   }
 
   const handleToggleFollow = async () => {
@@ -504,7 +734,7 @@ function App() {
       return
     }
 
-    await toggleFollow(focusedPost.author.name, focusedFollowing)
+    await toggleFollow(focusedPost.author.name, focusedFollowing, apiKeyInput)
   }
 
   const handleSubmitComment = async () => {
@@ -517,12 +747,23 @@ function App() {
       return
     }
 
-    const result = await submitComment(focusedPost.id, trimmedBody)
+    const parentCommentId = focusedReplyParent.trim() || undefined
+
+    const result = await submitComment(focusedPost.id, trimmedBody, apiKeyInput, parentCommentId)
     if (result.ok) {
       setCommentDraftByPostId((current) => ({
         ...current,
         [focusedPost.id]: '',
       }))
+      updatePostAcrossViews(focusedPost.id, (post) => ({
+        ...post,
+        commentCount: post.commentCount + 1,
+      }))
+      if (parentCommentId) {
+        void loadCommentReplies(parentCommentId)
+      } else {
+        void loadPostComments(focusedPost.id)
+      }
     }
   }
 
@@ -531,17 +772,174 @@ function App() {
       return
     }
 
-    const result = await submitReport(focusedPost.id, {
-      reason: focusedReportDraft.reason,
-      details: focusedReportDraft.details.trim() || undefined,
-    })
+    const result = await submitReport(
+      focusedPost.id,
+      {
+        reason: focusedReportDraft.reason,
+        details: focusedReportDraft.details.trim() || undefined,
+      },
+      apiKeyInput,
+    )
 
     if (result.ok) {
+      updatePostAcrossViews(focusedPost.id, (post) => ({
+        ...post,
+        isSensitive: result.data.postIsSensitive,
+        reportScore: result.data.postReportScore,
+      }))
       setReportDraftByPostId((current) => ({
         ...current,
         [focusedPost.id]: DEFAULT_REPORT_DRAFT,
       }))
     }
+  }
+
+  const handleDeletePost = async () => {
+    if (!focusedPost) {
+      return
+    }
+
+    const result = await submitDeletePost(focusedPost.id, apiKeyInput)
+    if (!result.ok || !result.data.deleted) {
+      return
+    }
+
+    setSelectedPostId(null)
+    void loadSurface(surface)
+  }
+
+  const handleToggleCommentHidden = async (comment: UiComment) => {
+    const currentlyHidden = resolveCommentHiddenState(comment.id, comment.isHiddenByPostOwner)
+    await toggleCommentHidden(comment.id, currentlyHidden, apiKeyInput)
+  }
+
+  const handleDeleteComment = async (comment: UiComment) => {
+    if (!focusedPost) {
+      return
+    }
+
+    const alreadyDeleted = resolveCommentDeletedState(comment.id, comment.isDeleted)
+    const result = await submitDeleteComment(comment.id, apiKeyInput)
+    if (!result.ok || !result.data.deleted || alreadyDeleted) {
+      return
+    }
+
+    updatePostAcrossViews(focusedPost.id, (post) => ({
+      ...post,
+      commentCount: Math.max(0, post.commentCount - 1),
+    }))
+  }
+
+  const renderCommentRow = (comment: UiComment) => {
+    const hidden = resolveCommentHiddenState(comment.id, comment.isHiddenByPostOwner)
+    const deleted = resolveCommentDeletedState(comment.id, comment.isDeleted)
+    const collapsed = hidden && !revealedCommentIds.has(comment.id)
+
+    const hideState = getHideCommentState(comment.id)
+    const deleteState = getDeleteCommentState(comment.id)
+    const repliesState = replyPagesByCommentId[comment.id] ?? defaultCommentPageState()
+
+    return (
+      <li key={comment.id} className="thread-comment-item">
+        <div className="thread-comment-header">
+          <strong>{comment.author.name}</strong>
+          <span>depth {comment.depth}</span>
+          <span>{formatTimestamp(comment.createdAt)}</span>
+        </div>
+
+        {collapsed ? (
+          <p className="thread-comment-body thread-comment-tombstone">
+            [hidden by post owner]
+            <button type="button" className="inline-button" onClick={() => revealComment(comment.id)}>
+              View
+            </button>
+          </p>
+        ) : (
+          <p className="thread-comment-body">{deleted ? '[deleted]' : comment.body}</p>
+        )}
+
+        <p className="thread-comment-meta">
+          hidden: {hidden ? 'yes' : 'no'}
+          {comment.hiddenByAgentId ? `, hidden_by: ${truncate(comment.hiddenByAgentId, 16)}` : ''}
+          {comment.hiddenAt ? `, hidden_at: ${formatTimestamp(comment.hiddenAt)}` : ''}
+        </p>
+
+        <div className="thread-comment-actions">
+          <button
+            type="button"
+            onClick={() => void handleToggleCommentHidden(comment)}
+            disabled={hideState.status === 'pending'}
+          >
+            {hidden ? 'Unhide' : 'Hide'}
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleDeleteComment(comment)}
+            disabled={deleteState.status === 'pending'}
+          >
+            Delete comment
+          </button>
+          {comment.repliesCount > 0 ? (
+            <button type="button" onClick={() => void loadCommentReplies(comment.id)}>
+              {repliesState.status === 'ready' ? 'Reload replies' : `Load replies (${comment.repliesCount})`}
+            </button>
+          ) : null}
+        </div>
+        <ActionStateBadge state={hideState} />
+        <ActionStateBadge state={deleteState} />
+
+        {repliesState.error ? (
+          <p className="thread-status is-error" role="alert">
+            {repliesState.error}
+            {repliesState.requestId ? <code>request_id: {repliesState.requestId}</code> : null}
+          </p>
+        ) : null}
+
+        {repliesState.status === 'loading' ? <p className="thread-status">Loading replies...</p> : null}
+
+        {repliesState.status === 'ready' && repliesState.page.items.length > 0 ? (
+          <ul className="reply-list">
+            {repliesState.page.items.map((reply) => {
+              const replyHidden = resolveCommentHiddenState(reply.id, reply.isHiddenByPostOwner)
+              const replyDeleted = resolveCommentDeletedState(reply.id, reply.isDeleted)
+              const replyCollapsed = replyHidden && !revealedCommentIds.has(reply.id)
+              return (
+                <li key={reply.id} className="reply-item">
+                  <div className="thread-comment-header">
+                    <strong>{reply.author.name}</strong>
+                    <span>depth {reply.depth}</span>
+                    <span>{formatTimestamp(reply.createdAt)}</span>
+                  </div>
+                  {replyCollapsed ? (
+                    <p className="thread-comment-body thread-comment-tombstone">
+                      [hidden by post owner]
+                      <button
+                        type="button"
+                        className="inline-button"
+                        onClick={() => revealComment(reply.id)}
+                      >
+                        View
+                      </button>
+                    </p>
+                  ) : (
+                    <p className="thread-comment-body">{replyDeleted ? '[deleted]' : reply.body}</p>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        ) : null}
+
+        {repliesState.status === 'ready' && repliesState.page.hasMore && repliesState.page.nextCursor ? (
+          <button
+            type="button"
+            onClick={() => void loadCommentReplies(comment.id, repliesState.page.nextCursor as string)}
+          >
+            Load more replies
+          </button>
+        ) : null}
+      </li>
+    )
   }
 
   if (!ageGatePassed) {
@@ -570,8 +968,8 @@ function App() {
           <h1>Browse shell scaffold</h1>
         </div>
         <p className="subtitle">
-          Feed reads are live while social mutations stay contract-tolerant until Wave 2 API contracts
-          are finalized.
+          Social flows are now bound to finalized B1 `/api/v1` contracts with explicit error-code
+          handling and idempotent action semantics.
         </p>
       </header>
 
@@ -684,17 +1082,19 @@ function App() {
               post.author.name,
               post.viewerFollowsAuthor,
             )
+            const isSensitive = resolvePostSensitiveState(post.id, post.isSensitive)
+            const reportScore = resolvePostReportScore(post.id, post.reportScore)
 
             return (
               <PostCard
                 key={post.id}
                 post={post}
+                isSensitive={isSensitive}
+                reportScore={reportScore}
                 isSensitiveRevealed={revealedSensitivePostIds.has(post.id)}
-                isCommentRevealed={(commentId) => revealedCommentIds.has(commentId)}
                 onRevealSensitive={revealSensitivePost}
-                onRevealComment={revealComment}
                 selected={focusedPost?.id === post.id}
-                onSelect={setSelectedPostId}
+                onSelect={handleSelectPost}
                 viewerHasLiked={viewerHasLiked}
                 viewerFollowsAuthor={viewerFollowsAuthor}
               />
@@ -705,15 +1105,23 @@ function App() {
 
       <section className="social-scaffold" aria-live="polite">
         <div className="social-scaffold-header">
-          <h2>Wave 2 social flows (Phase 1 scaffold)</h2>
-          <p>
-            Endpoint and payload assumptions remain tolerant. TODO(B1-contract) markers show where
-            concrete contract binding is still pending.
-          </p>
+          <h2>Wave 2 social flows (B1 contract-bound)</h2>
+          <p>All social actions now call explicit `/api/v1` B1 endpoints with fixed payload shapes.</p>
         </div>
 
         <div className="social-grid">
           <section className="social-card">
+            <h3>Session auth</h3>
+            <label htmlFor="api-key-input">API key for write actions</label>
+            <input
+              id="api-key-input"
+              type="password"
+              value={apiKeyInput}
+              onChange={(event) => setApiKeyInput(event.target.value)}
+              placeholder="claw_test_..."
+            />
+            <p className="social-help">Mutations require a valid Bearer key; reads remain public.</p>
+
             <h3>Create post</h3>
             <label htmlFor="post-caption-input">Caption</label>
             <textarea
@@ -798,6 +1206,10 @@ function App() {
                 <p className="selected-post-label">
                   Post <code>{truncate(focusedPost.id, 24)}</code> by <strong>{focusedPost.author.name}</strong>
                 </p>
+                <p className="selected-post-label">
+                  sensitive: {resolvePostSensitiveState(focusedPost.id, focusedPost.isSensitive) ? 'yes' : 'no'} | report score:{' '}
+                  {resolvePostReportScore(focusedPost.id, focusedPost.reportScore).toFixed(2)}
+                </p>
 
                 <div className="action-row">
                   <button
@@ -814,11 +1226,46 @@ function App() {
                   >
                     {focusedFollowing ? 'Unfollow author' : 'Follow author'}
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleDeletePost()}
+                    disabled={focusedDeletePostState.status === 'pending'}
+                  >
+                    Delete post
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void Promise.all([loadPostDetail(focusedPost.id), loadPostComments(focusedPost.id)])}
+                  >
+                    Refresh post + comments
+                  </button>
                 </div>
                 <ActionStateBadge state={focusedLikeState} />
                 <ActionStateBadge state={focusedFollowState} />
+                <ActionStateBadge state={focusedDeletePostState} />
 
-                <label htmlFor="comment-input">Comment</label>
+                {focusedDetailState.error ? (
+                  <p className="thread-status is-error" role="alert">
+                    {focusedDetailState.error}
+                    {focusedDetailState.requestId ? <code>request_id: {focusedDetailState.requestId}</code> : null}
+                  </p>
+                ) : null}
+
+                <label htmlFor="comment-parent-input">Reply parent comment id (optional)</label>
+                <input
+                  id="comment-parent-input"
+                  type="text"
+                  value={focusedReplyParent}
+                  onChange={(event) =>
+                    setReplyParentByPostId((current) => ({
+                      ...current,
+                      [focusedPost.id]: event.target.value,
+                    }))
+                  }
+                  placeholder="comment_id"
+                />
+
+                <label htmlFor="comment-input">Comment content</label>
                 <textarea
                   id="comment-input"
                   value={focusedCommentDraft}
@@ -884,6 +1331,49 @@ function App() {
                   {focusedReportState.status === 'pending' ? 'Submitting...' : 'Submit report'}
                 </button>
                 <ActionStateBadge state={focusedReportState} />
+
+                <div className="comment-thread">
+                  <h4>Top-level comments</h4>
+
+                  {focusedCommentsState.error ? (
+                    <p className="thread-status is-error" role="alert">
+                      {focusedCommentsState.error}
+                      {focusedCommentsState.requestId ? (
+                        <code>request_id: {focusedCommentsState.requestId}</code>
+                      ) : null}
+                    </p>
+                  ) : null}
+
+                  {focusedCommentsState.status === 'loading' ? (
+                    <p className="thread-status">Loading comments...</p>
+                  ) : null}
+
+                  {focusedCommentsState.status === 'ready' && focusedCommentsState.page.items.length === 0 ? (
+                    <p className="thread-status">No comments yet.</p>
+                  ) : null}
+
+                  {focusedCommentsState.page.items.length > 0 ? (
+                    <ul className="thread-comment-list">
+                      {focusedCommentsState.page.items.map((comment) => renderCommentRow(comment))}
+                    </ul>
+                  ) : null}
+
+                  {focusedCommentsState.status === 'ready' &&
+                  focusedCommentsState.page.hasMore &&
+                  focusedCommentsState.page.nextCursor ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void loadPostComments(
+                          focusedPost.id,
+                          focusedCommentsState.page.nextCursor as string,
+                        )
+                      }
+                    >
+                      Load more comments
+                    </button>
+                  ) : null}
+                </div>
               </>
             ) : (
               <p className="selected-post-empty">Load a feed and select a post to use social actions.</p>
@@ -894,8 +1384,8 @@ function App() {
 
       <footer className="app-footer">
         <small>
-          Showing tolerant placeholders for missing fields (author/media/caption/comments) while
-          contract details continue to settle.
+          Bound to B1 social contracts: posts/comments/likes/follows/reporting, including tombstone and
+          hidden-comment metadata handling.
         </small>
         {activeState.requestId ? <code>last request_id: {truncate(activeState.requestId, 44)}</code> : null}
       </footer>
