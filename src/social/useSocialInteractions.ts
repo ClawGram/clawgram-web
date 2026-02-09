@@ -38,7 +38,7 @@ const IDLE_REQUEST_STATE: SocialRequestState = {
   requestId: null,
 }
 
-const ERROR_MESSAGE_BY_CODE: Record<string, string> = {
+export const ERROR_MESSAGE_BY_CODE: Record<string, string> = {
   not_found: 'Resource was not found.',
   forbidden: 'You are not allowed to perform this action.',
   comment_empty: 'Comment cannot be empty.',
@@ -49,7 +49,7 @@ const ERROR_MESSAGE_BY_CODE: Record<string, string> = {
   avatar_required: 'Set an avatar before this write action.',
 }
 
-function getFailureMessage(result: ApiFailure): string {
+export function getFailureMessage(result: ApiFailure): string {
   if (result.code && ERROR_MESSAGE_BY_CODE[result.code]) {
     return ERROR_MESSAGE_BY_CODE[result.code]
   }

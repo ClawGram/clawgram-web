@@ -12,6 +12,10 @@ import {
 import type { ReportReason, UiComment, UiCommentPage, UiFeedPage, UiPost } from './api/adapters'
 import { useSocialInteractions } from './social/useSocialInteractions'
 import type { SocialRequestState } from './social/useSocialInteractions'
+import {
+  HIDDEN_COMMENT_TOMBSTONE,
+  getCommentPresentation,
+} from './social/commentPresentation'
 import './App.css'
 
 const AGE_GATE_STORAGE_KEY = 'clawgram.age_gate_acknowledged_at'
@@ -833,7 +837,12 @@ function App() {
   const renderCommentRow = (comment: UiComment) => {
     const hidden = resolveCommentHiddenState(comment.id, comment.isHiddenByPostOwner)
     const deleted = resolveCommentDeletedState(comment.id, comment.isDeleted)
-    const collapsed = hidden && !revealedCommentIds.has(comment.id)
+    const presentation = getCommentPresentation({
+      body: comment.body,
+      isHidden: hidden,
+      isDeleted: deleted,
+      isRevealed: revealedCommentIds.has(comment.id),
+    })
 
     const hideState = getHideCommentState(comment.id)
     const deleteState = getDeleteCommentState(comment.id)
@@ -847,15 +856,15 @@ function App() {
           <span>{formatTimestamp(comment.createdAt)}</span>
         </div>
 
-        {collapsed ? (
+        {presentation.collapsed ? (
           <p className="thread-comment-body thread-comment-tombstone">
-            [hidden by post owner]
+            {HIDDEN_COMMENT_TOMBSTONE}
             <button type="button" className="inline-button" onClick={() => revealComment(comment.id)}>
               View
             </button>
           </p>
         ) : (
-          <p className="thread-comment-body">{deleted ? '[deleted]' : comment.body}</p>
+          <p className="thread-comment-body">{presentation.bodyText}</p>
         )}
 
         <p className="thread-comment-meta">
@@ -902,7 +911,12 @@ function App() {
             {repliesState.page.items.map((reply) => {
               const replyHidden = resolveCommentHiddenState(reply.id, reply.isHiddenByPostOwner)
               const replyDeleted = resolveCommentDeletedState(reply.id, reply.isDeleted)
-              const replyCollapsed = replyHidden && !revealedCommentIds.has(reply.id)
+              const replyPresentation = getCommentPresentation({
+                body: reply.body,
+                isHidden: replyHidden,
+                isDeleted: replyDeleted,
+                isRevealed: revealedCommentIds.has(reply.id),
+              })
               return (
                 <li key={reply.id} className="reply-item">
                   <div className="thread-comment-header">
@@ -910,9 +924,9 @@ function App() {
                     <span>depth {reply.depth}</span>
                     <span>{formatTimestamp(reply.createdAt)}</span>
                   </div>
-                  {replyCollapsed ? (
+                  {replyPresentation.collapsed ? (
                     <p className="thread-comment-body thread-comment-tombstone">
-                      [hidden by post owner]
+                      {HIDDEN_COMMENT_TOMBSTONE}
                       <button
                         type="button"
                         className="inline-button"
@@ -922,7 +936,7 @@ function App() {
                       </button>
                     </p>
                   ) : (
-                    <p className="thread-comment-body">{replyDeleted ? '[deleted]' : reply.body}</p>
+                    <p className="thread-comment-body">{replyPresentation.bodyText}</p>
                   )}
                 </li>
               )
