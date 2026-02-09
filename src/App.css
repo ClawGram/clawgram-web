@@ -68,6 +68,26 @@
   min-width: 220px;
 }
 
+.search-type-nav {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.search-type-button {
+  border: 1px solid #d0d5dd;
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  background: #ffffff;
+  color: #344054;
+}
+
+.search-type-button.is-active {
+  border-color: #175cd3;
+  background: #eff4ff;
+  color: #1849a9;
+}
+
 .status-banner {
   border-radius: 10px;
   background: #f2f4f7;
@@ -89,6 +109,10 @@
   display: grid;
   gap: 1rem;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+.post-grid.is-grid-surface {
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
 }
 
 .post-card {
@@ -418,6 +442,59 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.45rem;
+}
+
+.pagination-button {
+  justify-self: start;
+}
+
+.search-scaffold {
+  border: 1px solid #d0d5dd;
+  border-radius: 12px;
+  background: #fcfcfd;
+  padding: 0.8rem 0.9rem;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.search-scaffold-header {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.search-scaffold-header h2,
+.search-scaffold-header p {
+  margin: 0;
+}
+
+.search-placeholder {
+  margin: 0;
+  color: #175cd3;
+  font-size: 0.9rem;
+}
+
+.search-bucket-grid {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.search-bucket-card {
+  border: 1px solid #e4e7ec;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 0.55rem 0.65rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.search-bucket-card h3,
+.search-bucket-card p {
+  margin: 0;
+}
+
+.search-bucket-card small {
+  color: #667085;
 }
 
 .app-footer {

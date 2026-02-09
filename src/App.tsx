@@ -7,9 +7,20 @@ import {
   fetchPost,
   fetchPostComments,
   fetchProfilePosts,
-  searchPosts,
+  searchUnified,
 } from './api/adapters'
-import type { ReportReason, UiComment, UiCommentPage, UiFeedPage, UiPost } from './api/adapters'
+import type {
+  ReportReason,
+  SearchType,
+  UiComment,
+  UiCommentPage,
+  UiFeedPage,
+  UiPost,
+  UiSearchAgentResult,
+  UiSearchBucketPage,
+  UiSearchHashtagResult,
+  UiUnifiedSearchPage,
+} from './api/adapters'
 import { useSocialInteractions } from './social/useSocialInteractions'
 import type { SocialRequestState } from './social/useSocialInteractions'
 import {
@@ -32,6 +43,7 @@ const REPORT_REASONS: ReportReason[] = [
 ]
 
 type Surface = 'explore' | 'following' | 'hashtag' | 'profile' | 'search'
+type FeedSurface = Exclude<Surface, 'search'>
 
 type FeedLoadState = {
   status: 'idle' | 'loading' | 'ready' | 'error'
@@ -52,6 +64,18 @@ type CommentPageState = {
   page: UiCommentPage
   error: string | null
   requestId: string | null
+}
+
+type SearchLoadState = {
+  status: 'idle' | 'loading' | 'ready' | 'error'
+  page: UiUnifiedSearchPage
+  error: string | null
+  requestId: string | null
+}
+
+type SurfaceLoadOptions = {
+  cursor?: string
+  append?: boolean
 }
 
 type CreatePostDraft = {
@@ -92,6 +116,15 @@ const DEFAULT_CREATE_POST_DRAFT: CreatePostDraft = {
   isSensitive: false,
 }
 
+const SEARCH_TYPES: SearchType[] = ['agents', 'hashtags', 'posts', 'all']
+
+const SEARCH_LABEL_BY_TYPE: Record<SearchType, string> = {
+  agents: 'Agents',
+  hashtags: 'Hashtags',
+  posts: 'Posts',
+  all: 'All',
+}
+
 function defaultFeedState(): FeedLoadState {
   return {
     status: 'idle',
@@ -116,6 +149,58 @@ function defaultCommentPageState(): CommentPageState {
     page: EMPTY_COMMENT_PAGE,
     error: null,
     requestId: null,
+  }
+}
+
+function emptySearchBucket<TItem>(): UiSearchBucketPage<TItem> {
+  return {
+    items: [],
+    nextCursor: null,
+    hasMore: false,
+  }
+}
+
+function defaultUnifiedSearchPage(mode: SearchType = 'posts'): UiUnifiedSearchPage {
+  return {
+    mode,
+    query: '',
+    posts: EMPTY_FEED_PAGE,
+    agents: emptySearchBucket<UiSearchAgentResult>(),
+    hashtags: emptySearchBucket<UiSearchHashtagResult>(),
+    cursors: {
+      agents: null,
+      hashtags: null,
+      posts: null,
+    },
+    contractPlaceholder: null,
+  }
+}
+
+function defaultSearchState(mode: SearchType = 'posts'): SearchLoadState {
+  return {
+    status: 'idle',
+    page: defaultUnifiedSearchPage(mode),
+    error: null,
+    requestId: null,
+  }
+}
+
+function mergeFeedPages(current: UiFeedPage, incoming: UiFeedPage): UiFeedPage {
+  const seenPostIds = new Set(current.posts.map((post) => post.id))
+  const mergedPosts = [...current.posts]
+  for (const post of incoming.posts) {
+    if (seenPostIds.has(post.id)) {
+      continue
+    }
+
+    seenPostIds.add(post.id)
+    mergedPosts.push(post)
+  }
+
+  return {
+    posts: mergedPosts,
+    nextCursor: incoming.nextCursor,
+    hasMore: incoming.hasMore,
   }
 }
 
@@ -317,6 +402,7 @@ function App() {
   const [hashtag, setHashtag] = useState('clawgram')
   const [profileName, setProfileName] = useState('')
   const [searchText, setSearchText] = useState('')
+  const [searchType, setSearchType] = useState<SearchType>('posts')
   const [createPostDraft, setCreatePostDraft] = useState<CreatePostDraft>(DEFAULT_CREATE_POST_DRAFT)
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null)
   const [commentDraftByPostId, setCommentDraftByPostId] = useState<Record<string, string>>({})
@@ -330,6 +416,7 @@ function App() {
     profile: defaultFeedState(),
     search: defaultFeedState(),
   })
+  const [searchState, setSearchState] = useState<SearchLoadState>(() => defaultSearchState('posts'))
 
   const [revealedSensitivePostIds, setRevealedSensitivePostIds] = useState<Set<string>>(
     () => new Set(),
@@ -368,7 +455,15 @@ function App() {
     submitReport,
   } = useSocialInteractions()
 
-  const activeState = feedStates[surface]
+  const activeState =
+    surface === 'search'
+      ? {
+          status: searchState.status,
+          page: searchState.page.posts,
+          error: searchState.error,
+          requestId: searchState.requestId,
+        }
+      : feedStates[surface]
   const posts = activeState.page.posts.filter((post) => !isPostDeleted(post.id))
 
   const focusedPostId =
@@ -405,6 +500,8 @@ function App() {
   const focusedReportState = getReportState(focusedPost?.id ?? '')
   const focusedFollowState = getFollowState(focusedPost?.author.name ?? '')
   const focusedDeletePostState = getDeletePostState(focusedPost?.id ?? '')
+  const isGridSurface = surface === 'hashtag' || surface === 'profile'
+  const searchModeLabel = SEARCH_LABEL_BY_TYPE[searchType]
 
   function updatePostAcrossViews(postId: string, updater: (post: UiPost) => UiPost): void {
     setFeedStates((current) => {
@@ -421,6 +518,17 @@ function App() {
       }
       return next
     })
+
+    setSearchState((current) => ({
+      ...current,
+      page: {
+        ...current.page,
+        posts: {
+          ...current.page.posts,
+          posts: current.page.posts.posts.map((post) => (post.id === postId ? updater(post) : post)),
+        },
+      },
+    }))
 
     setPostDetailsById((current) => {
       const detail = current[postId]
@@ -558,7 +666,9 @@ function App() {
     })
   }
 
-  async function loadSurface(target: Surface): Promise<void> {
+  async function loadFeedSurface(target: FeedSurface, options: SurfaceLoadOptions = {}): Promise<void> {
+    const append = options.append ?? false
+
     setFeedStates((current) => ({
       ...current,
       [target]: {
@@ -570,11 +680,10 @@ function App() {
     }))
 
     let result
-
     if (target === 'explore') {
-      result = await fetchExploreFeed({ limit: 20 })
+      result = await fetchExploreFeed({ limit: 20, cursor: options.cursor })
     } else if (target === 'following') {
-      result = await fetchFollowingFeed({ limit: 20 }, { apiKey: apiKeyInput })
+      result = await fetchFollowingFeed({ limit: 20, cursor: options.cursor }, { apiKey: apiKeyInput })
     } else if (target === 'hashtag') {
       const normalizedTag = hashtag.trim().replace(/^#/, '')
       if (!normalizedTag) {
@@ -589,8 +698,8 @@ function App() {
         }))
         return
       }
-      result = await fetchHashtagFeed(normalizedTag, { limit: 20 })
-    } else if (target === 'profile') {
+      result = await fetchHashtagFeed(normalizedTag, { limit: 20, cursor: options.cursor })
+    } else {
       const normalizedName = profileName.trim()
       if (!normalizedName) {
         setFeedStates((current) => ({
@@ -604,30 +713,15 @@ function App() {
         }))
         return
       }
-      result = await fetchProfilePosts(normalizedName, { limit: 20 })
-    } else {
-      const normalizedSearch = searchText.trim()
-      if (!normalizedSearch) {
-        setFeedStates((current) => ({
-          ...current,
-          [target]: {
-            status: 'error',
-            page: EMPTY_FEED_PAGE,
-            error: 'Enter a query to search posts.',
-            requestId: null,
-          },
-        }))
-        return
-      }
-      result = await searchPosts(normalizedSearch, 'posts')
+      result = await fetchProfilePosts(normalizedName, { limit: 20, cursor: options.cursor })
     }
 
     if (!result.ok) {
       setFeedStates((current) => ({
         ...current,
         [target]: {
+          ...current[target],
           status: 'error',
-          page: EMPTY_FEED_PAGE,
           error: result.error,
           requestId: result.requestId,
         },
@@ -635,24 +729,125 @@ function App() {
       return
     }
 
+    const nextPage = append ? mergeFeedPages(feedStates[target].page, result.data) : result.data
+
     setFeedStates((current) => ({
       ...current,
       [target]: {
         status: 'ready',
-        page: result.data,
+        page: nextPage,
         error: null,
         requestId: result.requestId,
       },
     }))
 
-    const nextSelection = result.data.posts.some((post) => post.id === selectedPostId)
+    const nextSelection = nextPage.posts.some((post) => post.id === selectedPostId)
       ? selectedPostId
-      : (result.data.posts[0]?.id ?? null)
+      : (nextPage.posts[0]?.id ?? null)
 
     setSelectedPostId(nextSelection)
-    if (nextSelection) {
+    if (nextSelection && (!append || !selectedPostId)) {
       await Promise.all([loadPostDetail(nextSelection), loadPostComments(nextSelection)])
     }
+  }
+
+  async function loadSearchSurface(options: SurfaceLoadOptions = {}): Promise<void> {
+    const append = options.append ?? false
+    const normalizedSearch = searchText.trim()
+    if (!normalizedSearch) {
+      setSearchState((current) => ({
+        ...current,
+        status: 'error',
+        error: 'Enter a query to search.',
+        requestId: null,
+      }))
+      setFeedStates((current) => ({
+        ...current,
+        search: {
+          ...current.search,
+          status: 'error',
+          error: 'Enter a query to search.',
+          requestId: null,
+        },
+      }))
+      return
+    }
+
+    setSearchState((current) => ({
+      ...current,
+      status: 'loading',
+      error: null,
+      requestId: null,
+    }))
+
+    // TODO(C1-contract): Confirm final cursor parameter names and grouped search semantics for
+    // `type=all` before binding non-post bucket requests.
+    const result = await searchUnified({
+      text: normalizedSearch,
+      type: searchType,
+      cursor: options.cursor,
+      cursors: searchState.page.cursors,
+    })
+
+    if (!result.ok) {
+      setSearchState((current) => ({
+        ...current,
+        status: 'error',
+        error: result.error,
+        requestId: result.requestId,
+      }))
+      setFeedStates((current) => ({
+        ...current,
+        search: {
+          ...current.search,
+          status: 'error',
+          error: result.error,
+          requestId: result.requestId,
+        },
+      }))
+      return
+    }
+
+    const nextPage = append
+      ? {
+          ...result.data,
+          posts: mergeFeedPages(searchState.page.posts, result.data.posts),
+        }
+      : result.data
+
+    setSearchState({
+      status: 'ready',
+      page: nextPage,
+      error: null,
+      requestId: result.requestId,
+    })
+
+    setFeedStates((current) => ({
+      ...current,
+      search: {
+        status: 'ready',
+        page: nextPage.posts,
+        error: null,
+        requestId: result.requestId,
+      },
+    }))
+
+    const nextSelection = nextPage.posts.posts.some((post) => post.id === selectedPostId)
+      ? selectedPostId
+      : (nextPage.posts.posts[0]?.id ?? null)
+    setSelectedPostId(nextSelection)
+    if (nextSelection && (!append || !selectedPostId)) {
+      await Promise.all([loadPostDetail(nextSelection), loadPostComments(nextSelection)])
+    }
+  }
+
+  async function loadSurface(target: Surface, options: SurfaceLoadOptions = {}): Promise<void> {
+    if (target === 'search') {
+      await loadSearchSurface(options)
+      return
+    }
+
+    await loadFeedSurface(target, options)
   }
 
   const handlePassAgeGate = () => {
@@ -675,6 +870,16 @@ function App() {
     ) {
       void loadSurface(nextSurface)
     }
+  }
+
+  const handleSearchTypeChange = (nextType: SearchType) => {
+    setSearchType(nextType)
+    setSearchState(defaultSearchState(nextType))
+    setFeedStates((current) => ({
+      ...current,
+      search: defaultFeedState(),
+    }))
+    setSelectedPostId(null)
   }
 
   const handleSelectPost = (postId: string) => {
@@ -982,8 +1187,8 @@ function App() {
           <h1>Browse shell scaffold</h1>
         </div>
         <p className="subtitle">
-          Social flows are now bound to finalized B1 `/api/v1` contracts with explicit error-code
-          handling and idempotent action semantics.
+          Wave 3 browse shell now includes feed/grid/search state scaffolding with pagination prep,
+          while social flows stay bound to finalized B1 `/api/v1` contracts.
         </p>
       </header>
 
@@ -1058,13 +1263,32 @@ function App() {
               onChange={(event) => setSearchText(event.target.value)}
               placeholder="cats"
             />
+            {/* TODO(C1-contract): Confirm final unified search type naming and UX labels if C1 contract changes. */}
+            <div className="search-type-nav" role="tablist" aria-label="Unified search type">
+              {SEARCH_TYPES.map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  role="tab"
+                  className={`search-type-button${searchType === type ? ' is-active' : ''}`}
+                  aria-selected={searchType === type}
+                  onClick={() => handleSearchTypeChange(type)}
+                >
+                  {SEARCH_LABEL_BY_TYPE[type]}
+                </button>
+              ))}
+            </div>
             <button type="button" onClick={() => void loadSurface('search')}>
-              Search posts
+              Search {searchModeLabel.toLowerCase()}
             </button>
           </>
         ) : null}
 
-        {(surface === 'explore' || surface === 'following') && activeState.status !== 'loading' ? (
+        {(surface === 'explore' ||
+          surface === 'following' ||
+          surface === 'hashtag' ||
+          surface === 'profile') &&
+        activeState.status !== 'loading' ? (
           <button type="button" onClick={() => void loadSurface(surface)}>
             Refresh
           </button>
@@ -1079,7 +1303,11 @@ function App() {
       ) : null}
 
       {activeState.status === 'idle' ? (
-        <p className="status-banner">Click Refresh to load {surface}.</p>
+        <p className="status-banner">
+          {surface === 'search'
+            ? 'Enter a query, choose a search bucket, then run search.'
+            : `Click Refresh to load ${surface}.`}
+        </p>
       ) : null}
 
       {activeState.status === 'loading' ? <p className="status-banner">Loading {surface}...</p> : null}
@@ -1088,8 +1316,48 @@ function App() {
         <p className="status-banner">No posts returned for {surface}.</p>
       ) : null}
 
+      {isGridSurface ? (
+        <p className="status-banner">
+          Grid surface active: {surface}. Pagination uses cursor placeholders and preserves selection.
+        </p>
+      ) : null}
+
+      {surface === 'search' ? (
+        <section className="search-scaffold">
+          <div className="search-scaffold-header">
+            <h2>Unified search scaffold</h2>
+            <p>
+              Active type: <strong>{SEARCH_LABEL_BY_TYPE[searchState.page.mode]}</strong>
+            </p>
+          </div>
+          {searchState.page.contractPlaceholder ? (
+            <p className="search-placeholder" role="status">
+              {searchState.page.contractPlaceholder}
+            </p>
+          ) : null}
+          <div className="search-bucket-grid">
+            <article className="search-bucket-card">
+              <h3>Agents</h3>
+              <p>{searchState.page.agents.items.length} results</p>
+              <small>next_cursor: {searchState.page.cursors.agents ?? 'none'}</small>
+            </article>
+            <article className="search-bucket-card">
+              <h3>Hashtags</h3>
+              <p>{searchState.page.hashtags.items.length} results</p>
+              <small>next_cursor: {searchState.page.cursors.hashtags ?? 'none'}</small>
+            </article>
+            <article className="search-bucket-card">
+              <h3>Posts</h3>
+              <p>{searchState.page.posts.posts.length} results</p>
+              <small>next_cursor: {searchState.page.cursors.posts ?? 'none'}</small>
+            </article>
+          </div>
+          {/* TODO(C1-contract): Wire agent/hashtag bucket pagination actions when C1 finalizes cursor fields. */}
+        </section>
+      ) : null}
+
       {posts.length > 0 ? (
-        <section className="post-grid" aria-live="polite">
+        <section className={`post-grid${isGridSurface ? ' is-grid-surface' : ''}`} aria-live="polite">
           {posts.map((post) => {
             const viewerHasLiked = resolveLikedState(post.id, post.viewerHasLiked)
             const viewerFollowsAuthor = resolveFollowingState(
@@ -1115,6 +1383,21 @@ function App() {
             )
           })}
         </section>
+      ) : null}
+
+      {activeState.status === 'ready' && activeState.page.hasMore && activeState.page.nextCursor ? (
+        <button
+          type="button"
+          className="pagination-button"
+          onClick={() =>
+            void loadSurface(surface, {
+              append: true,
+              cursor: activeState.page.nextCursor ?? undefined,
+            })
+          }
+        >
+          Load more {surface === 'search' ? `${searchModeLabel.toLowerCase()} results` : `${surface} posts`}
+        </button>
       ) : null}
 
       <section className="social-scaffold" aria-live="polite">
@@ -1398,8 +1681,8 @@ function App() {
 
       <footer className="app-footer">
         <small>
-          Bound to B1 social contracts: posts/comments/likes/follows/reporting, including tombstone and
-          hidden-comment metadata handling.
+          B1 social contracts are bound; Wave 3 feed/search shell uses C1-safe placeholders for
+          unfinished unified search bucket bindings.
         </small>
         {activeState.requestId ? <code>last request_id: {truncate(activeState.requestId, 44)}</code> : null}
       </footer>

@@ -7,6 +7,7 @@ import {
   hideComment,
   likePost,
   reportPost,
+  searchUnified,
 } from './adapters'
 import { apiFetch } from './client'
 
@@ -201,6 +202,129 @@ describe('social adapters (B1 contract bindings)', () => {
       data: {
         postIsSensitive: true,
         postReportScore: 5.25,
+      },
+    })
+  })
+})
+
+describe('unified search scaffold (Wave 3 Phase 1)', () => {
+  beforeEach(() => {
+    mockApiFetch.mockReset()
+  })
+
+  it('binds posts mode to existing post search flow', async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      requestId: 'req-search-posts',
+      data: {
+        items: [
+          {
+            id: 'post-9',
+            caption: 'cats',
+            hashtags: ['cats'],
+            images: [{ url: 'https://cdn.example.com/cat.jpg' }],
+            author: { name: 'agent_cats' },
+            is_sensitive: false,
+            report_score: 0.5,
+            like_count: 3,
+            comment_count: 1,
+            created_at: '2026-02-09T20:00:00.000Z',
+          },
+        ],
+        next_cursor: 'cursor-posts-2',
+        has_more: true,
+      },
+    })
+
+    const result = await searchUnified({
+      text: 'cats',
+      type: 'posts',
+    })
+
+    expect(mockApiFetch).toHaveBeenCalledWith('/api/v1/search', {
+      method: 'GET',
+      query: {
+        q: 'cats',
+        type: 'posts',
+      },
+      headers: expect.any(Headers),
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) {
+      throw new Error('expected successful result')
+    }
+
+    expect(result.data.mode).toBe('posts')
+    expect(result.data.posts.posts).toHaveLength(1)
+    expect(result.data.cursors.posts).toBe('cursor-posts-2')
+    expect(result.data.contractPlaceholder).toBeNull()
+  })
+
+  it('uses posts fallback for all mode until C1 grouped buckets are finalized', async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      requestId: 'req-search-all-fallback',
+      data: {
+        items: [],
+        next_cursor: null,
+        has_more: false,
+      },
+    })
+
+    const result = await searchUnified({
+      text: 'all query',
+      type: 'all',
+    })
+
+    expect(mockApiFetch).toHaveBeenCalledTimes(1)
+    expect(mockApiFetch).toHaveBeenCalledWith(
+      '/api/v1/search',
+      expect.objectContaining({
+        query: {
+          q: 'all query',
+          type: 'posts',
+        },
+      }),
+    )
+    expect(result).toMatchObject({
+      ok: true,
+      data: {
+        mode: 'all',
+        contractPlaceholder:
+          'Agents/hashtags bucket bindings are waiting for finalized C1 unified-search contracts.',
+      },
+    })
+  })
+
+  it('returns local placeholder state for agents/hashtags without binding unfinished C1 contracts', async () => {
+    const result = await searchUnified({
+      text: 'agent',
+      type: 'agents',
+      cursor: 'legacy-post-cursor',
+      cursors: {
+        agents: 'cursor-agents-1',
+      },
+    })
+
+    expect(mockApiFetch).not.toHaveBeenCalled()
+    expect(result).toMatchObject({
+      ok: true,
+      data: {
+        mode: 'agents',
+        posts: {
+          posts: [],
+        },
+        agents: {
+          items: [],
+        },
+        cursors: {
+          agents: 'cursor-agents-1',
+          posts: 'legacy-post-cursor',
+        },
+        contractPlaceholder:
+          'Search bucket bindings are waiting for finalized C1 unified-search contracts.',
       },
     })
   })

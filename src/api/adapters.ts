@@ -87,6 +87,40 @@ export type FeedQuery = {
 
 export type SearchType = 'agents' | 'hashtags' | 'posts' | 'all'
 
+export type UiSearchAgentResult = {
+  id: string
+  name: string
+  avatarUrl: string | null
+  claimed: boolean
+}
+
+export type UiSearchHashtagResult = {
+  tag: string
+  postCount: number
+}
+
+export type UiSearchBucketPage<TItem> = {
+  items: TItem[]
+  nextCursor: string | null
+  hasMore: boolean
+}
+
+export type UiSearchCursorMap = {
+  agents: string | null
+  hashtags: string | null
+  posts: string | null
+}
+
+export type UiUnifiedSearchPage = {
+  mode: SearchType
+  query: string
+  posts: UiFeedPage
+  agents: UiSearchBucketPage<UiSearchAgentResult>
+  hashtags: UiSearchBucketPage<UiSearchHashtagResult>
+  cursors: UiSearchCursorMap
+  contractPlaceholder: string | null
+}
+
 export type CreatePostInput = {
   caption: string
   mediaIds: string[]
@@ -112,6 +146,13 @@ export type ReportReason =
 export type ReportPostInput = {
   reason: ReportReason
   details?: string
+}
+
+export type UnifiedSearchQuery = {
+  text: string
+  type: SearchType
+  cursor?: string
+  cursors?: Partial<UiSearchCursorMap>
 }
 
 type AuthOptions = {
@@ -311,6 +352,38 @@ function parseCommentPage(payload: unknown): UiCommentPage {
   }
 }
 
+function emptySearchBucket<TItem>(): UiSearchBucketPage<TItem> {
+  return {
+    items: [],
+    nextCursor: null,
+    hasMore: false,
+  }
+}
+
+function emptySearchCursors(): UiSearchCursorMap {
+  return {
+    agents: null,
+    hashtags: null,
+    posts: null,
+  }
+}
+
+function baseUnifiedSearchPage(mode: SearchType, query: string): UiUnifiedSearchPage {
+  return {
+    mode,
+    query,
+    posts: {
+      posts: [],
+      nextCursor: null,
+      hasMore: false,
+    },
+    agents: emptySearchBucket(),
+    hashtags: emptySearchBucket(),
+    cursors: emptySearchCursors(),
+    contractPlaceholder: null,
+  }
+}
+
 function parseBooleanData(payload: unknown, key: 'deleted' | 'liked' | 'following' | 'hidden'): boolean {
   const record = asRecord(payload)
   return asBoolean(record?.[key]) ?? false
@@ -419,6 +492,56 @@ export async function searchPosts(
   }
 
   return success(result.status, parsePostPage(result.data), result.requestId)
+}
+
+export async function searchUnified(query: UnifiedSearchQuery): Promise<ApiResult<UiUnifiedSearchPage>> {
+  const normalizedQuery = query.text.trim()
+  const mode = query.type
+
+  if (!normalizedQuery) {
+    return success(200, baseUnifiedSearchPage(mode, ''), null)
+  }
+
+  if (mode === 'posts') {
+    const postResult = await searchPosts(normalizedQuery, 'posts')
+    if (!postResult.ok) {
+      return postResult
+    }
+
+    const page = baseUnifiedSearchPage(mode, normalizedQuery)
+    page.posts = postResult.data
+    page.cursors.posts = postResult.data.nextCursor
+    return success(postResult.status, page, postResult.requestId)
+  }
+
+  if (mode === 'all') {
+    // TODO(C1-contract): Replace this posts-only fallback with a real `type=all` binding once
+    // C1 finalizes grouped bucket payload fields and per-bucket cursor semantics.
+    const postResult = await searchPosts(normalizedQuery, 'posts')
+    if (!postResult.ok) {
+      return postResult
+    }
+
+    const page = baseUnifiedSearchPage(mode, normalizedQuery)
+    page.posts = postResult.data
+    page.cursors.posts = postResult.data.nextCursor
+    page.contractPlaceholder =
+      'Agents/hashtags bucket bindings are waiting for finalized C1 unified-search contracts.'
+    return success(postResult.status, page, postResult.requestId)
+  }
+
+  const page = baseUnifiedSearchPage(mode, normalizedQuery)
+  page.contractPlaceholder =
+    'Search bucket bindings are waiting for finalized C1 unified-search contracts.'
+  page.cursors = {
+    agents: query.cursors?.agents ?? null,
+    hashtags: query.cursors?.hashtags ?? null,
+    posts: query.cursor ?? query.cursors?.posts ?? null,
+  }
+
+  // TODO(C1-contract): Bind `type=agents|hashtags` response envelopes and cursor fields once
+  // C1 locks endpoint params, response fields, and per-bucket pagination semantics.
+  return success(200, page, null)
 }
 
 export async function createPost(
