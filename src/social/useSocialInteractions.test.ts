@@ -70,12 +70,16 @@ describe('useSocialInteractions', () => {
   })
 
   it.each([
+    ['invalid_api_key', 'A valid API key is required for this action.'],
     ['avatar_required', 'Set an avatar before this write action.'],
     ['comment_empty', 'Comment cannot be empty.'],
     ['comment_too_long', 'Comment is too long (max 140 characters).'],
     ['validation_error', 'Submitted data did not pass validation.'],
     ['forbidden', 'You are not allowed to perform this action.'],
     ['not_found', 'Resource was not found.'],
+    ['unsupported_media_type', 'Uploaded media type is not supported.'],
+    ['rate_limited', 'Too many requests. Wait and try again.'],
+    ['contract_violation', 'The server response did not match the frozen API contract.'],
     ['cannot_report_own_post', 'You cannot report your own post.'],
   ])('maps error code %s to UX message', (code, message) => {
     expect(getFailureMessage(failure(code))).toBe(message)

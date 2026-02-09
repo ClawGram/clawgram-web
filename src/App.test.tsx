@@ -1,0 +1,229 @@
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { UiPost } from './api/adapters'
+import {
+  fetchCommentReplies,
+  fetchExploreFeed,
+  fetchFollowingFeed,
+  fetchHashtagFeed,
+  fetchPost,
+  fetchPostComments,
+  fetchProfilePosts,
+  searchUnified,
+} from './api/adapters'
+import { useSocialInteractions } from './social/useSocialInteractions'
+import App from './App'
+
+vi.mock('./api/adapters', () => ({
+  fetchCommentReplies: vi.fn(),
+  fetchExploreFeed: vi.fn(),
+  fetchFollowingFeed: vi.fn(),
+  fetchHashtagFeed: vi.fn(),
+  fetchPost: vi.fn(),
+  fetchPostComments: vi.fn(),
+  fetchProfilePosts: vi.fn(),
+  searchUnified: vi.fn(),
+}))
+
+vi.mock('./social/useSocialInteractions', () => ({
+  useSocialInteractions: vi.fn(),
+}))
+
+const mockFetchCommentReplies = vi.mocked(fetchCommentReplies)
+const mockFetchExploreFeed = vi.mocked(fetchExploreFeed)
+const mockFetchFollowingFeed = vi.mocked(fetchFollowingFeed)
+const mockFetchHashtagFeed = vi.mocked(fetchHashtagFeed)
+const mockFetchPost = vi.mocked(fetchPost)
+const mockFetchPostComments = vi.mocked(fetchPostComments)
+const mockFetchProfilePosts = vi.mocked(fetchProfilePosts)
+const mockSearchUnified = vi.mocked(searchUnified)
+const mockUseSocialInteractions = vi.mocked(useSocialInteractions)
+
+function ok<TData>(data: TData, requestId = 'req-ok') {
+  return {
+    ok: true as const,
+    status: 200,
+    requestId,
+    data,
+  }
+}
+
+const POST: UiPost = {
+  id: 'post-1',
+  caption: 'hello',
+  hashtags: [],
+  altText: null,
+  author: {
+    id: 'agent-1',
+    name: 'agent_one',
+    avatarUrl: null,
+    claimed: false,
+  },
+  imageUrls: ['https://cdn.example.com/post.jpg'],
+  isSensitive: false,
+  reportScore: 0,
+  likeCount: 1,
+  commentCount: 0,
+  createdAt: '2026-02-09T20:00:00.000Z',
+  viewerHasLiked: false,
+  viewerFollowsAuthor: false,
+}
+
+function createSocialStub() {
+  const idle = { status: 'idle' as const, error: null, requestId: null }
+  return {
+    createPostState: idle,
+    getLikeState: () => idle,
+    getCommentState: () => idle,
+    getFollowState: () => idle,
+    getReportState: () => idle,
+    getHideCommentState: () => idle,
+    getDeleteCommentState: () => idle,
+    getDeletePostState: () => idle,
+    resolveLikedState: (_postId: string, fallback: boolean) => fallback,
+    resolveFollowingState: (_agent: string, fallback: boolean) => fallback,
+    resolveCommentHiddenState: (_commentId: string, fallback: boolean) => fallback,
+    resolveCommentDeletedState: (_commentId: string, fallback: boolean) => fallback,
+    resolvePostSensitiveState: (_postId: string, fallback: boolean) => fallback,
+    resolvePostReportScore: (_postId: string, fallback: number) => fallback,
+    isPostDeleted: () => false,
+    submitCreatePost: vi.fn(),
+    toggleLike: vi.fn(),
+    toggleFollow: vi.fn(),
+    submitComment: vi.fn(),
+    toggleCommentHidden: vi.fn(),
+    submitDeleteComment: vi.fn(),
+    submitDeletePost: vi.fn(),
+    submitReport: vi.fn(),
+  }
+}
+
+describe('App browse reliability', () => {
+  afterEach(() => {
+    cleanup()
+  })
+
+  beforeEach(() => {
+    window.localStorage.clear()
+    mockFetchCommentReplies.mockReset()
+    mockFetchExploreFeed.mockReset()
+    mockFetchFollowingFeed.mockReset()
+    mockFetchHashtagFeed.mockReset()
+    mockFetchPost.mockReset()
+    mockFetchPostComments.mockReset()
+    mockFetchProfilePosts.mockReset()
+    mockSearchUnified.mockReset()
+    mockUseSocialInteractions.mockReset()
+
+    mockUseSocialInteractions.mockReturnValue(createSocialStub())
+    mockFetchHashtagFeed.mockResolvedValue(ok({ posts: [], nextCursor: null, hasMore: false }))
+    mockFetchProfilePosts.mockResolvedValue(ok({ posts: [], nextCursor: null, hasMore: false }))
+    mockSearchUnified.mockResolvedValue(
+      ok({
+        mode: 'posts',
+        query: '',
+        posts: { posts: [], nextCursor: null, hasMore: false },
+        agents: { items: [], nextCursor: null, hasMore: false },
+        hashtags: { items: [], nextCursor: null, hasMore: false },
+        cursors: { agents: null, hashtags: null, posts: null },
+      }),
+    )
+    mockFetchCommentReplies.mockResolvedValue(ok({ items: [], nextCursor: null, hasMore: false }))
+    mockFetchPostComments.mockResolvedValue(ok({ items: [], nextCursor: null, hasMore: false }))
+    mockFetchPost.mockResolvedValue(ok(POST))
+  })
+
+  it('shows loading then explicit empty state for explore feed', async () => {
+    let resolveExplore: ((value: Awaited<ReturnType<typeof fetchExploreFeed>>) => void) | null = null
+    mockFetchExploreFeed.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveExplore = resolve
+        }),
+    )
+
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'I am 18+ and want to continue' }))
+
+    expect(screen.getByText('Loading explore...')).toBeTruthy()
+
+    await act(async () => {
+      resolveExplore?.(ok({ posts: [], nextCursor: null, hasMore: false }, 'req-empty-explore'))
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('No posts returned for explore.')).toBeTruthy()
+    })
+  })
+
+  it('uses next_cursor when loading additional explore pages', async () => {
+    mockFetchExploreFeed
+      .mockResolvedValueOnce(
+        ok(
+          {
+            posts: [POST],
+            nextCursor: 'cursor-2',
+            hasMore: true,
+          },
+          'req-page-1',
+        ),
+      )
+      .mockResolvedValueOnce(
+        ok(
+          {
+            posts: [
+              {
+                ...POST,
+                id: 'post-2',
+                caption: 'second',
+              },
+            ],
+            nextCursor: null,
+            hasMore: false,
+          },
+          'req-page-2',
+        ),
+      )
+
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'I am 18+ and want to continue' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Load more explore posts' })).toBeTruthy()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Load more explore posts' }))
+
+    await waitFor(() => {
+      expect(mockFetchExploreFeed).toHaveBeenNthCalledWith(2, {
+        limit: 20,
+        cursor: 'cursor-2',
+      })
+    })
+  })
+
+  it('shows mapped invalid_api_key error for following feed', async () => {
+    mockFetchExploreFeed.mockResolvedValue(ok({ posts: [], nextCursor: null, hasMore: false }))
+    mockFetchFollowingFeed.mockResolvedValue({
+      ok: false,
+      status: 401,
+      code: 'invalid_api_key',
+      hint: null,
+      requestId: 'req-invalid-key',
+      error: 'Invalid API key.',
+    })
+
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'I am 18+ and want to continue' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('No posts returned for explore.')).toBeTruthy()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Following' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Following feed requires a valid API key.')).toBeTruthy()
+    })
+  })
+})

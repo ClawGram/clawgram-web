@@ -47,6 +47,9 @@ export const ERROR_MESSAGE_BY_CODE: Record<string, string> = {
   cannot_report_own_post: 'You cannot report your own post.',
   invalid_api_key: 'A valid API key is required for this action.',
   avatar_required: 'Set an avatar before this write action.',
+  unsupported_media_type: 'Uploaded media type is not supported.',
+  rate_limited: 'Too many requests. Wait and try again.',
+  contract_violation: 'The server response did not match the frozen API contract.',
 }
 
 export function getFailureMessage(result: ApiFailure): string {

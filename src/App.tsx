@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { type KeyboardEvent, useState } from 'react'
 import {
   fetchCommentReplies,
   fetchExploreFeed,
@@ -76,6 +76,7 @@ type SearchLoadState = {
 }
 
 type SearchBucket = keyof UiSearchCursorMap
+type ReadSurface = Surface | 'post_detail' | 'comments' | 'replies'
 
 type SurfaceLoadOptions = {
   cursor?: string
@@ -361,7 +362,7 @@ function mergeUnifiedSearchPage(options: {
 }
 
 function mapReadPathError(options: {
-  surface: Surface
+  surface: ReadSurface
   code: string | null
   fallback: string
 }): string {
@@ -379,6 +380,26 @@ function mapReadPathError(options: {
 
   if (options.code === 'validation_error') {
     return 'Request parameters are invalid. Refresh and try again.'
+  }
+
+  if (options.code === 'rate_limited') {
+    return 'Too many requests. Wait briefly and try again.'
+  }
+
+  if (options.code === 'contract_violation') {
+    return 'Server response did not match the frozen API contract.'
+  }
+
+  if (options.code === 'not_found' && options.surface === 'post_detail') {
+    return 'Selected post was not found.'
+  }
+
+  if (options.code === 'not_found' && options.surface === 'comments') {
+    return 'Comments could not be loaded because the post was not found.'
+  }
+
+  if (options.code === 'not_found' && options.surface === 'replies') {
+    return 'Replies could not be loaded because the comment was not found.'
   }
 
   return options.fallback
@@ -465,6 +486,7 @@ function SurfaceButton({
       type="button"
       className={`surface-button${active ? ' is-active' : ''}`}
       onClick={onClick}
+      aria-pressed={active}
     >
       {label}
     </button>
@@ -477,7 +499,11 @@ function ActionStateBadge({ state }: { state: SocialRequestState }) {
   }
 
   if (state.status === 'pending') {
-    return <p className="action-status">Saving...</p>
+    return (
+      <p className="action-status" role="status" aria-live="polite">
+        Saving...
+      </p>
+    )
   }
 
   if (state.status === 'error') {
@@ -490,7 +516,7 @@ function ActionStateBadge({ state }: { state: SocialRequestState }) {
   }
 
   return (
-    <p className="action-status is-success">
+    <p className="action-status is-success" role="status" aria-live="polite">
       Saved.
       {state.requestId ? <code>request_id: {state.requestId}</code> : null}
     </p>
@@ -751,7 +777,11 @@ function App() {
         : {
             status: 'error',
             post: null,
-            error: result.error,
+            error: mapReadPathError({
+              surface: 'post_detail',
+              code: result.code,
+              fallback: result.error,
+            }),
             requestId: result.requestId,
           },
     }))
@@ -779,7 +809,11 @@ function App() {
           [postId]: {
             ...existing,
             status: 'error',
-            error: result.error,
+            error: mapReadPathError({
+              surface: 'comments',
+              code: result.code,
+              fallback: result.error,
+            }),
             requestId: result.requestId,
           },
         }
@@ -825,7 +859,11 @@ function App() {
           [commentId]: {
             ...existing,
             status: 'error',
-            error: result.error,
+            error: mapReadPathError({
+              surface: 'replies',
+              code: result.code,
+              fallback: result.error,
+            }),
             requestId: result.requestId,
           },
         }
@@ -1131,6 +1169,37 @@ function App() {
     setSelectedPostId(null)
   }
 
+  const handleSearchTypeKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (
+      event.key !== 'ArrowRight' &&
+      event.key !== 'ArrowLeft' &&
+      event.key !== 'Home' &&
+      event.key !== 'End'
+    ) {
+      return
+    }
+
+    event.preventDefault()
+    const currentIndex = SEARCH_TYPES.indexOf(searchType)
+    if (currentIndex < 0) {
+      return
+    }
+
+    if (event.key === 'Home') {
+      handleSearchTypeChange(SEARCH_TYPES[0])
+      return
+    }
+
+    if (event.key === 'End') {
+      handleSearchTypeChange(SEARCH_TYPES[SEARCH_TYPES.length - 1])
+      return
+    }
+
+    const direction = event.key === 'ArrowRight' ? 1 : -1
+    const nextIndex = (currentIndex + direction + SEARCH_TYPES.length) % SEARCH_TYPES.length
+    handleSearchTypeChange(SEARCH_TYPES[nextIndex])
+  }
+
   const handleSelectPost = (postId: string) => {
     setSelectedPostId(postId)
     void Promise.all([loadPostDetail(postId), loadPostComments(postId)])
@@ -1358,7 +1427,15 @@ function App() {
           </p>
         ) : null}
 
-        {repliesState.status === 'loading' ? <p className="thread-status">Loading replies...</p> : null}
+        {repliesState.status === 'loading' ? (
+          <p className="thread-status" role="status" aria-live="polite">
+            Loading replies...
+          </p>
+        ) : null}
+
+        {repliesState.status === 'ready' && repliesState.page.items.length === 0 ? (
+          <p className="thread-status">No replies yet.</p>
+        ) : null}
 
         {repliesState.status === 'ready' && repliesState.page.items.length > 0 ? (
           <ul className="reply-list">
@@ -1512,15 +1589,15 @@ function App() {
               onChange={(event) => setSearchText(event.target.value)}
               placeholder="cats"
             />
-            <div className="search-type-nav" role="tablist" aria-label="Unified search type">
+            <div className="search-type-nav" role="group" aria-label="Unified search type">
               {SEARCH_TYPES.map((type) => (
                 <button
                   key={type}
                   type="button"
-                  role="tab"
                   className={`search-type-button${searchType === type ? ' is-active' : ''}`}
-                  aria-selected={searchType === type}
+                  aria-pressed={searchType === type}
                   onClick={() => handleSearchTypeChange(type)}
+                  onKeyDown={handleSearchTypeKeyDown}
                 >
                   {SEARCH_LABEL_BY_TYPE[type]}
                 </button>
@@ -1551,17 +1628,23 @@ function App() {
       ) : null}
 
       {activeState.status === 'idle' ? (
-        <p className="status-banner">
+        <p className="status-banner" role="status" aria-live="polite">
           {surface === 'search'
             ? 'Enter at least 2 characters, choose a search bucket, then run search.'
             : `Click Refresh to load ${surface}.`}
         </p>
       ) : null}
 
-      {activeState.status === 'loading' ? <p className="status-banner">Loading {surface}...</p> : null}
+      {activeState.status === 'loading' ? (
+        <p className="status-banner" role="status" aria-live="polite">
+          Loading {surface}...
+        </p>
+      ) : null}
 
       {activeState.status === 'ready' && posts.length === 0 ? (
-        <p className="status-banner">No posts returned for {surface}.</p>
+        <p className="status-banner" role="status" aria-live="polite">
+          No posts returned for {surface}.
+        </p>
       ) : null}
 
       {isGridSurface ? (
@@ -1571,7 +1654,11 @@ function App() {
       ) : null}
 
       {surface === 'search' ? (
-        <section className="search-scaffold">
+        <section
+          className="search-scaffold"
+          aria-live="polite"
+          aria-busy={searchState.status === 'loading'}
+        >
           <div className="search-scaffold-header">
             <h2>Unified search results</h2>
             <p>
@@ -1596,7 +1683,9 @@ function App() {
                     </li>
                   ))}
                 </ul>
-              ) : null}
+              ) : (
+                <p className="thread-status">No agent results in this page.</p>
+              )}
               {searchState.page.mode === 'agents' || searchState.page.mode === 'all' ? (
                 <button
                   type="button"
@@ -1625,7 +1714,9 @@ function App() {
                     </li>
                   ))}
                 </ul>
-              ) : null}
+              ) : (
+                <p className="thread-status">No hashtag results in this page.</p>
+              )}
               {searchState.page.mode === 'hashtags' || searchState.page.mode === 'all' ? (
                 <button
                   type="button"
@@ -1647,6 +1738,9 @@ function App() {
               <h3>Posts</h3>
               <p>{searchState.page.posts.posts.length} results</p>
               <small>next_cursor: {searchState.page.cursors.posts ?? 'none'}</small>
+              {searchState.page.posts.posts.length === 0 ? (
+                <p className="thread-status">No post results in this page.</p>
+              ) : null}
               {(searchState.page.mode === 'posts' || searchState.page.mode === 'all') &&
               searchState.page.posts.hasMore &&
               searchPostsLoadCursor ? (
@@ -1669,7 +1763,11 @@ function App() {
       ) : null}
 
       {posts.length > 0 ? (
-        <section className={`post-grid${isGridSurface ? ' is-grid-surface' : ''}`} aria-live="polite">
+        <section
+          className={`post-grid${isGridSurface ? ' is-grid-surface' : ''}`}
+          aria-live="polite"
+          aria-busy={activeState.status === 'loading'}
+        >
           {posts.map((post) => {
             const viewerHasLiked = resolveLikedState(post.id, post.viewerHasLiked)
             const viewerFollowsAuthor = resolveFollowingState(
@@ -1856,6 +1954,12 @@ function App() {
                 <ActionStateBadge state={focusedFollowState} />
                 <ActionStateBadge state={focusedDeletePostState} />
 
+                {focusedDetailState.status === 'loading' ? (
+                  <p className="thread-status" role="status" aria-live="polite">
+                    Loading post detail...
+                  </p>
+                ) : null}
+
                 {focusedDetailState.error ? (
                   <p className="thread-status is-error" role="alert">
                     {focusedDetailState.error}
@@ -1944,7 +2048,11 @@ function App() {
                 </button>
                 <ActionStateBadge state={focusedReportState} />
 
-                <div className="comment-thread">
+                <div
+                  className="comment-thread"
+                  aria-live="polite"
+                  aria-busy={focusedCommentsState.status === 'loading'}
+                >
                   <h4>Top-level comments</h4>
 
                   {focusedCommentsState.error ? (
@@ -1957,7 +2065,9 @@ function App() {
                   ) : null}
 
                   {focusedCommentsState.status === 'loading' ? (
-                    <p className="thread-status">Loading comments...</p>
+                    <p className="thread-status" role="status" aria-live="polite">
+                      Loading comments...
+                    </p>
                   ) : null}
 
                   {focusedCommentsState.status === 'ready' && focusedCommentsState.page.items.length === 0 ? (

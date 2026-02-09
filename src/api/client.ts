@@ -71,72 +71,68 @@ function parseErrorMessage(body: unknown, fallback: string): string {
   )
 }
 
+function contractViolation(
+  response: Response,
+  requestId: string | null,
+  detail: string,
+): ApiFailure {
+  return {
+    ok: false,
+    status: response.status,
+    error: `Response contract mismatch: ${detail}`,
+    code: 'contract_violation',
+    hint: 'Expected frozen API envelope { success, data|error, request_id }.',
+    requestId,
+  }
+}
+
 function parseEnvelope<TData>(
   body: unknown,
   response: Response,
   requestIdHeader: string | null,
 ): ApiResult<TData> {
-  if (isRecord(body)) {
-    const requestId = asString(body.request_id) ?? requestIdHeader
-    const success = body.success
-
-    if (typeof success === 'boolean') {
-      if (success) {
-        const payload = ('data' in body ? body.data : body) as TData
-        return {
-          ok: true,
-          status: response.status,
-          data: payload,
-          requestId,
-        }
-      }
-
-      return {
-        ok: false,
-        status: response.status,
-        error: parseErrorMessage(body, response.statusText || 'Request failed.'),
-        code: asString(body.code),
-        hint: asString(body.hint),
-        requestId,
-      }
-    }
-
-    if (response.ok) {
-      const payload = ('data' in body ? body.data : body) as TData
-      return {
-        ok: true,
-        status: response.status,
-        data: payload,
-        requestId,
-      }
-    }
-
-    return {
-      ok: false,
-      status: response.status,
-      error: parseErrorMessage(body, response.statusText || 'Request failed.'),
-      code: asString(body.code),
-      hint: asString(body.hint),
-      requestId,
-    }
+  if (!isRecord(body)) {
+    return contractViolation(response, requestIdHeader, 'Body is not a JSON object.')
   }
 
-  if (response.ok) {
+  const requestIdBody = asString(body.request_id)
+  const requestId = requestIdBody ?? requestIdHeader
+  if (!requestId) {
+    return contractViolation(response, null, 'request_id is missing from body/header.')
+  }
+
+  if (requestIdBody && requestIdHeader && requestIdBody !== requestIdHeader) {
+    return contractViolation(response, requestIdBody, 'request_id differs from X-Request-Id header.')
+  }
+
+  if (typeof body.success !== 'boolean') {
+    return contractViolation(response, requestId, 'success boolean is missing.')
+  }
+
+  if (body.success) {
+    if (!response.ok) {
+      return contractViolation(response, requestId, 'success=true with non-2xx HTTP status.')
+    }
+
+    if (!('data' in body)) {
+      return contractViolation(response, requestId, 'data payload is missing for successful response.')
+    }
+
     return {
       ok: true,
       status: response.status,
-      data: body as TData,
-      requestId: requestIdHeader,
+      data: body.data as TData,
+      requestId,
     }
   }
 
   return {
     ok: false,
     status: response.status,
-    error: response.statusText || 'Request failed.',
-    code: null,
-    hint: null,
-    requestId: requestIdHeader,
+    error: parseErrorMessage(body, response.statusText || 'Request failed.'),
+    code: asString(body.code),
+    hint: asString(body.hint),
+    requestId,
   }
 }
 

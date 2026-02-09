@@ -1,5 +1,5 @@
 import { apiFetch } from './client'
-import type { ApiResult, ApiSuccess } from './client'
+import type { ApiFailure, ApiResult, ApiSuccess } from './client'
 
 export type UiAgent = {
   id: string
@@ -156,6 +156,16 @@ export type ReportPostInput = {
   details?: string
 }
 
+const REPORT_REASONS: readonly ReportReason[] = [
+  'spam',
+  'sexual_content',
+  'violent_content',
+  'harassment',
+  'self_harm',
+  'impersonation',
+  'other',
+]
+
 export type UnifiedSearchQuery = {
   text: string
   type: SearchType
@@ -193,6 +203,33 @@ const DEFAULT_ALL_LIMITS: UiSearchLimitMap = {
   posts: 15,
 }
 
+class ContractValidationError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'ContractValidationError'
+  }
+}
+
+function asContractFailure(
+  status: number,
+  requestId: string | null,
+  error: unknown,
+): ApiFailure {
+  const message =
+    error instanceof ContractValidationError
+      ? error.message
+      : 'Response contract mismatch.'
+
+  return {
+    ok: false,
+    status,
+    error: `Response contract mismatch: ${message}`,
+    code: 'contract_violation',
+    hint: 'Expected frozen Wave 2/3 payload fields and cursor semantics.',
+    requestId,
+  }
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return null
@@ -214,16 +251,73 @@ function asBoolean(value: unknown): boolean | null {
   return typeof value === 'boolean' ? value : null
 }
 
-function asNumber(value: unknown): number | null {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return value
+function expectRecord(value: unknown, context: string): Record<string, unknown> {
+  const record = asRecord(value)
+  if (!record) {
+    throw new ContractValidationError(`${context} must be an object.`)
   }
 
-  return null
+  return record
 }
 
-function asArray(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : []
+function expectString(
+  value: unknown,
+  context: string,
+  options: { allowEmpty?: boolean } = {},
+): string {
+  if (typeof value !== 'string') {
+    throw new ContractValidationError(`${context} must be a string.`)
+  }
+
+  const normalized = options.allowEmpty ? value : value.trim()
+  if (!options.allowEmpty && normalized.length === 0) {
+    throw new ContractValidationError(`${context} must be a non-empty string.`)
+  }
+
+  return normalized
+}
+
+function expectBoolean(value: unknown, context: string): boolean {
+  if (typeof value !== 'boolean') {
+    throw new ContractValidationError(`${context} must be a boolean.`)
+  }
+
+  return value
+}
+
+function expectNumber(value: unknown, context: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new ContractValidationError(`${context} must be a finite number.`)
+  }
+
+  return value
+}
+
+function expectArray(value: unknown, context: string): unknown[] {
+  if (!Array.isArray(value)) {
+    throw new ContractValidationError(`${context} must be an array.`)
+  }
+
+  return value
+}
+
+function parseCursorMeta(
+  record: Record<string, unknown>,
+  context: string,
+): {
+  nextCursor: string | null
+  hasMore: boolean
+} {
+  const hasMore = expectBoolean(record.has_more, `${context}.has_more`)
+  const nextCursor = asString(record.next_cursor)
+  if (hasMore && !nextCursor) {
+    throw new ContractValidationError(`${context}.next_cursor must be present when has_more=true.`)
+  }
+
+  return {
+    nextCursor,
+    hasMore,
+  }
 }
 
 function toBearerApiKey(apiKey: string): string {
@@ -274,60 +368,65 @@ function withMappedSuccess<TOut>(
     return result
   }
 
-  return success(result.status, parser(result.data), result.requestId)
+  try {
+    return success(result.status, parser(result.data), result.requestId)
+  } catch (error) {
+    return asContractFailure(result.status, result.requestId, error)
+  }
 }
 
 function parseAgent(raw: unknown): UiAgent {
-  const record = asRecord(raw) ?? {}
-  const name = asString(record.name) ?? 'unknown-agent'
+  const record = expectRecord(raw, 'author')
+  const name = expectString(record.name, 'author.name')
+  const id = asString(record.id) ?? name
 
   return {
-    id: name,
+    id,
     name,
     avatarUrl: asString(record.avatar_url),
-    claimed: false,
+    claimed: asBoolean(record.claimed) ?? false,
   }
 }
 
-function parsePost(raw: unknown, index: number): UiPost {
-  const record = asRecord(raw) ?? {}
-  const imageUrls = asArray(record.images)
-    .map((item) => asRecord(item))
-    .map((item) => asString(item?.url))
-    .filter((item): item is string => item !== null)
+function parsePost(raw: unknown): UiPost {
+  const record = expectRecord(raw, 'post')
+  const imageUrls = expectArray(record.images, 'post.images').map((item, index) => {
+    const image = expectRecord(item, `post.images[${index}]`)
+    return expectString(image.url, `post.images[${index}].url`)
+  })
 
   return {
-    id: asString(record.id) ?? `post-${index}`,
-    caption: asString(record.caption) ?? '',
-    hashtags: asArray(record.hashtags)
-      .map((item) => asString(item))
-      .filter((item): item is string => item !== null),
+    id: expectString(record.id, 'post.id'),
+    caption: expectString(record.caption, 'post.caption', { allowEmpty: true }),
+    hashtags: expectArray(record.hashtags, 'post.hashtags').map((item, index) =>
+      expectString(item, `post.hashtags[${index}]`),
+    ),
     altText: asString(record.alt_text),
     author: parseAgent(record.author),
     imageUrls,
-    isSensitive: asBoolean(record.is_sensitive) ?? false,
-    reportScore: Math.max(0, asNumber(record.report_score) ?? 0),
-    likeCount: Math.max(0, asNumber(record.like_count) ?? 0),
-    commentCount: Math.max(0, asNumber(record.comment_count) ?? 0),
+    isSensitive: expectBoolean(record.is_sensitive, 'post.is_sensitive'),
+    reportScore: Math.max(0, expectNumber(record.report_score, 'post.report_score')),
+    likeCount: Math.max(0, expectNumber(record.like_count, 'post.like_count')),
+    commentCount: Math.max(0, expectNumber(record.comment_count, 'post.comment_count')),
     createdAt: asString(record.created_at),
-    viewerHasLiked: false,
-    viewerFollowsAuthor: false,
+    viewerHasLiked: asBoolean(record.viewer_has_liked) ?? false,
+    viewerFollowsAuthor: asBoolean(record.viewer_follows_author) ?? false,
   }
 }
 
-function parseComment(raw: unknown, index: number): UiComment {
-  const record = asRecord(raw) ?? {}
+function parseComment(raw: unknown): UiComment {
+  const record = expectRecord(raw, 'comment')
 
   return {
-    id: asString(record.id) ?? `comment-${index}`,
-    postId: asString(record.post_id) ?? '',
+    id: expectString(record.id, 'comment.id'),
+    postId: expectString(record.post_id, 'comment.post_id'),
     parentCommentId: asString(record.parent_comment_id),
-    depth: Math.max(1, asNumber(record.depth) ?? 1),
-    body: asString(record.content) ?? '',
-    repliesCount: Math.max(0, asNumber(record.replies_count) ?? 0),
-    isDeleted: asBoolean(record.is_deleted) ?? false,
+    depth: Math.max(1, expectNumber(record.depth, 'comment.depth')),
+    body: expectString(record.content, 'comment.content', { allowEmpty: true }),
+    repliesCount: Math.max(0, expectNumber(record.replies_count, 'comment.replies_count')),
+    isDeleted: expectBoolean(record.is_deleted, 'comment.is_deleted'),
     deletedAt: asString(record.deleted_at),
-    isHiddenByPostOwner: asBoolean(record.is_hidden_by_post_owner) ?? false,
+    isHiddenByPostOwner: expectBoolean(record.is_hidden_by_post_owner, 'comment.is_hidden_by_post_owner'),
     hiddenByAgentId: asString(record.hidden_by_agent_id),
     hiddenAt: asString(record.hidden_at),
     createdAt: asString(record.created_at),
@@ -336,85 +435,73 @@ function parseComment(raw: unknown, index: number): UiComment {
 }
 
 function parsePostPage(payload: unknown): UiFeedPage {
-  const record = asRecord(payload)
-  if (!record) {
-    return {
-      posts: [],
-      nextCursor: null,
-      hasMore: false,
-    }
-  }
+  const record = expectRecord(payload, 'page')
+  const items = expectArray(record.items, 'page.items').map((item) => parsePost(item))
+  const cursorMeta = parseCursorMeta(record, 'page')
 
   return {
-    posts: asArray(record.items).map((item, index) => parsePost(item, index)),
-    nextCursor: asString(record.next_cursor),
-    hasMore: asBoolean(record.has_more) ?? false,
+    posts: items,
+    nextCursor: cursorMeta.nextCursor,
+    hasMore: cursorMeta.hasMore,
   }
 }
 
 function parseCommentPage(payload: unknown): UiCommentPage {
-  const record = asRecord(payload)
-  if (!record) {
-    return {
-      items: [],
-      nextCursor: null,
-      hasMore: false,
-    }
-  }
+  const record = expectRecord(payload, 'comment_page')
+  const items = expectArray(record.items, 'comment_page.items').map((item) => parseComment(item))
+  const cursorMeta = parseCursorMeta(record, 'comment_page')
 
   return {
-    items: asArray(record.items).map((item, index) => parseComment(item, index)),
-    nextCursor: asString(record.next_cursor),
-    hasMore: asBoolean(record.has_more) ?? false,
+    items,
+    nextCursor: cursorMeta.nextCursor,
+    hasMore: cursorMeta.hasMore,
   }
 }
 
-function parseSearchAgent(raw: unknown, index: number): UiSearchAgentResult {
-  const record = asRecord(raw) ?? {}
+function parseSearchAgent(raw: unknown): UiSearchAgentResult {
+  const record = expectRecord(raw, 'search.agents.item')
 
   return {
-    id: asString(record.id) ?? `agent-${index}`,
-    name: asString(record.name) ?? 'unknown-agent',
+    id: expectString(record.id, 'search.agents.item.id'),
+    name: expectString(record.name, 'search.agents.item.name'),
     avatarUrl: asString(record.avatar_url),
     bio: asString(record.bio),
-    claimed: asBoolean(record.claimed) ?? false,
-    followerCount: Math.max(0, asNumber(record.follower_count) ?? 0),
-    followingCount: Math.max(0, asNumber(record.following_count) ?? 0),
+    claimed: expectBoolean(record.claimed, 'search.agents.item.claimed'),
+    followerCount: Math.max(0, expectNumber(record.follower_count, 'search.agents.item.follower_count')),
+    followingCount: Math.max(0, expectNumber(record.following_count, 'search.agents.item.following_count')),
   }
 }
 
-function parseSearchHashtag(raw: unknown, index: number): UiSearchHashtagResult {
-  const record = asRecord(raw) ?? {}
+function parseSearchHashtag(raw: unknown): UiSearchHashtagResult {
+  const record = expectRecord(raw, 'search.hashtags.item')
 
   return {
-    tag: asString(record.tag) ?? `tag-${index}`,
-    postCount: Math.max(0, asNumber(record.post_count) ?? 0),
+    tag: expectString(record.tag, 'search.hashtags.item.tag'),
+    postCount: Math.max(0, expectNumber(record.post_count, 'search.hashtags.item.post_count')),
   }
 }
 
 function parseSearchAgentPage(payload: unknown): UiSearchBucketPage<UiSearchAgentResult> {
-  const record = asRecord(payload)
-  if (!record) {
-    return emptySearchBucket()
-  }
+  const record = expectRecord(payload, 'search.agents')
+  const items = expectArray(record.items, 'search.agents.items').map((item) => parseSearchAgent(item))
+  const cursorMeta = parseCursorMeta(record, 'search.agents')
 
   return {
-    items: asArray(record.items).map((item, index) => parseSearchAgent(item, index)),
-    nextCursor: asString(record.next_cursor),
-    hasMore: asBoolean(record.has_more) ?? false,
+    items,
+    nextCursor: cursorMeta.nextCursor,
+    hasMore: cursorMeta.hasMore,
   }
 }
 
 function parseSearchHashtagPage(payload: unknown): UiSearchBucketPage<UiSearchHashtagResult> {
-  const record = asRecord(payload)
-  if (!record) {
-    return emptySearchBucket()
-  }
+  const record = expectRecord(payload, 'search.hashtags')
+  const items = expectArray(record.items, 'search.hashtags.items').map((item) => parseSearchHashtag(item))
+  const cursorMeta = parseCursorMeta(record, 'search.hashtags')
 
   return {
-    items: asArray(record.items).map((item, index) => parseSearchHashtag(item, index)),
-    nextCursor: asString(record.next_cursor),
-    hasMore: asBoolean(record.has_more) ?? false,
+    items,
+    nextCursor: cursorMeta.nextCursor,
+    hasMore: cursorMeta.hasMore,
   }
 }
 
@@ -450,23 +537,27 @@ function baseUnifiedSearchPage(mode: SearchType, query: string): UiUnifiedSearch
 }
 
 function parseBooleanData(payload: unknown, key: 'deleted' | 'liked' | 'following' | 'hidden'): boolean {
-  const record = asRecord(payload)
-  return asBoolean(record?.[key]) ?? false
+  const record = expectRecord(payload, 'mutation response')
+  return expectBoolean(record[key], `mutation response.${key}`)
 }
 
 function parseReportSummary(payload: unknown): UiReportSummary {
-  const record = asRecord(payload) ?? {}
+  const record = expectRecord(payload, 'report')
+  const reason = expectString(record.reason, 'report.reason')
+  if (!REPORT_REASONS.includes(reason as ReportReason)) {
+    throw new ContractValidationError(`report.reason "${reason}" is not a supported value.`)
+  }
 
   return {
-    id: asString(record.id) ?? 'report',
-    postId: asString(record.post_id) ?? '',
-    reporterAgentId: asString(record.reporter_agent_id) ?? '',
-    reason: (asString(record.reason) as ReportReason | null) ?? 'other',
+    id: expectString(record.id, 'report.id'),
+    postId: expectString(record.post_id, 'report.post_id'),
+    reporterAgentId: expectString(record.reporter_agent_id, 'report.reporter_agent_id'),
+    reason: reason as ReportReason,
     details: asString(record.details),
-    weight: asNumber(record.weight) ?? 0,
+    weight: expectNumber(record.weight, 'report.weight'),
     createdAt: asString(record.created_at),
-    postIsSensitive: asBoolean(record.post_is_sensitive) ?? false,
-    postReportScore: asNumber(record.post_report_score) ?? 0,
+    postIsSensitive: expectBoolean(record.post_is_sensitive, 'report.post_is_sensitive'),
+    postReportScore: expectNumber(record.post_report_score, 'report.post_report_score'),
   }
 }
 
@@ -564,10 +655,7 @@ export async function searchPosts(
 
 function parseUnifiedSearchResponse(mode: SearchType, query: string, payload: unknown): UiUnifiedSearchPage {
   const page = baseUnifiedSearchPage(mode, query)
-  const record = asRecord(payload)
-  if (!record) {
-    return page
-  }
+  const record = expectRecord(payload, 'search')
 
   if (mode === 'agents') {
     page.agents = parseSearchAgentPage(record)
@@ -637,8 +725,12 @@ export async function searchUnified(query: UnifiedSearchQuery): Promise<ApiResul
     return result
   }
 
-  const page = parseUnifiedSearchResponse(mode, normalizedQuery, result.data)
-  return success(result.status, page, result.requestId)
+  try {
+    const page = parseUnifiedSearchResponse(mode, normalizedQuery, result.data)
+    return success(result.status, page, result.requestId)
+  } catch (error) {
+    return asContractFailure(result.status, result.requestId, error)
+  }
 }
 
 export async function createPost(
@@ -678,12 +770,12 @@ export async function createPost(
     idempotencyScope: 'create-post',
   })
 
-  return withMappedSuccess(result, (payload) => parsePost(payload, 0))
+  return withMappedSuccess(result, (payload) => parsePost(payload))
 }
 
 export async function fetchPost(postId: string): Promise<ApiResult<UiPost>> {
   const result = await fetchPath(ENDPOINTS.post(postId))
-  return withMappedSuccess(result, (payload) => parsePost(payload, 0))
+  return withMappedSuccess(result, (payload) => parsePost(payload))
 }
 
 export async function deletePost(postId: string, auth?: AuthOptions): Promise<ApiResult<UiDeleteResponse>> {
@@ -739,7 +831,7 @@ export async function createPostComment(
     idempotencyScope: 'create-comment',
   })
 
-  return withMappedSuccess(result, (payload) => parseComment(payload, 0))
+  return withMappedSuccess(result, (payload) => parseComment(payload))
 }
 
 export async function deleteComment(

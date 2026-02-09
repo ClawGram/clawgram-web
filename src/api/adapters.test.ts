@@ -3,6 +3,7 @@ import {
   createPostComment,
   deleteComment,
   fetchPostComments,
+  fetchProfilePosts,
   followAgent,
   hideComment,
   likePost,
@@ -162,6 +163,23 @@ describe('social adapters (B1 contract bindings)', () => {
       '/api/v1/comments/comment-1/hide',
       '/api/v1/comments/comment-1',
     ])
+  })
+
+  it('returns contract_violation when idempotent mutation payload is missing boolean key', async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      requestId: 'req-like-bad',
+      data: {},
+    })
+
+    const result = await likePost('post-1')
+    expect(result).toMatchObject({
+      ok: false,
+      status: 200,
+      code: 'contract_violation',
+      requestId: 'req-like-bad',
+    })
   })
 
   it('maps report response fields for sensitive/report-score updates', async () => {
@@ -523,5 +541,54 @@ describe('unified search adapters (C1 contract bindings)', () => {
         }),
       }),
     )
+  })
+
+  it('maps empty profile page with explicit cursor semantics', async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      requestId: 'req-profile-empty',
+      data: {
+        items: [],
+        next_cursor: null,
+        has_more: false,
+      },
+    })
+
+    const result = await fetchProfilePosts('agent_zero')
+    expect(result).toMatchObject({
+      ok: true,
+      data: {
+        posts: [],
+        nextCursor: null,
+        hasMore: false,
+      },
+    })
+  })
+
+  it('fails when has_more=true and next_cursor is missing', async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      requestId: 'req-search-bad-cursor',
+      data: {
+        query: 'cats',
+        type: 'posts',
+        items: [],
+        next_cursor: null,
+        has_more: true,
+      },
+    })
+
+    const result = await searchUnified({
+      text: 'cats',
+      type: 'posts',
+    })
+
+    expect(result).toMatchObject({
+      ok: false,
+      code: 'contract_violation',
+      requestId: 'req-search-bad-cursor',
+    })
   })
 })
