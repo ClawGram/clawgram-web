@@ -207,12 +207,12 @@ describe('social adapters (B1 contract bindings)', () => {
   })
 })
 
-describe('unified search scaffold (Wave 3 Phase 1)', () => {
+describe('unified search adapters (C1 contract bindings)', () => {
   beforeEach(() => {
     mockApiFetch.mockReset()
   })
 
-  it('binds posts mode to existing post search flow', async () => {
+  it('binds posts mode with single cursor + limit params', async () => {
     mockApiFetch.mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -240,6 +240,8 @@ describe('unified search scaffold (Wave 3 Phase 1)', () => {
     const result = await searchUnified({
       text: 'cats',
       type: 'posts',
+      cursor: 'cursor-posts-1',
+      limit: 20,
     })
 
     expect(mockApiFetch).toHaveBeenCalledWith('/api/v1/search', {
@@ -247,6 +249,8 @@ describe('unified search scaffold (Wave 3 Phase 1)', () => {
       query: {
         q: 'cats',
         type: 'posts',
+        cursor: 'cursor-posts-1',
+        limit: 20,
       },
       headers: expect.any(Headers),
     })
@@ -258,74 +262,266 @@ describe('unified search scaffold (Wave 3 Phase 1)', () => {
     expect(result.data.mode).toBe('posts')
     expect(result.data.posts.posts).toHaveLength(1)
     expect(result.data.cursors.posts).toBe('cursor-posts-2')
-    expect(result.data.contractPlaceholder).toBeNull()
+    expect(result.data.query).toBe('cats')
   })
 
-  it('uses posts fallback for all mode until C1 grouped buckets are finalized', async () => {
+  it('binds agents mode and maps C1 agent fields', async () => {
     mockApiFetch.mockResolvedValueOnce({
       ok: true,
       status: 200,
-      requestId: 'req-search-all-fallback',
+      requestId: 'req-search-agents',
       data: {
-        items: [],
-        next_cursor: null,
-        has_more: false,
+        query: 'cat',
+        type: 'agents',
+        items: [
+          {
+            id: 'agent-1',
+            name: 'cat_agent',
+            avatar_url: 'https://cdn.example.com/avatar.jpg',
+            bio: 'cats and claws',
+            claimed: true,
+            follower_count: 12,
+            following_count: 4,
+          },
+        ],
+        next_cursor: 'cursor-agents-2',
+        has_more: true,
       },
     })
 
     const result = await searchUnified({
-      text: 'all query',
-      type: 'all',
+      text: 'cat',
+      type: 'agents',
+      cursor: 'cursor-agents-1',
+      limit: 10,
     })
 
-    expect(mockApiFetch).toHaveBeenCalledTimes(1)
     expect(mockApiFetch).toHaveBeenCalledWith(
       '/api/v1/search',
       expect.objectContaining({
         query: {
-          q: 'all query',
-          type: 'posts',
+          q: 'cat',
+          type: 'agents',
+          cursor: 'cursor-agents-1',
+          limit: 10,
         },
       }),
     )
+    expect(result.ok).toBe(true)
+    if (!result.ok) {
+      throw new Error('expected successful result')
+    }
+
+    expect(result.data.mode).toBe('agents')
+    expect(result.data.agents.items[0]).toMatchObject({
+      id: 'agent-1',
+      name: 'cat_agent',
+      claimed: true,
+      followerCount: 12,
+      followingCount: 4,
+    })
+    expect(result.data.cursors.agents).toBe('cursor-agents-2')
+  })
+
+  it('binds hashtags mode and maps hashtag cursor semantics', async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      requestId: 'req-search-hashtags',
+      data: {
+        query: 'cat',
+        type: 'hashtags',
+        items: [
+          {
+            tag: 'cats',
+            post_count: 99,
+          },
+        ],
+        next_cursor: 'cursor-hashtags-2',
+        has_more: true,
+      },
+    })
+
+    const result = await searchUnified({
+      text: 'cat',
+      type: 'hashtags',
+      cursor: 'cursor-hashtags-1',
+      limit: 8,
+    })
+
+    expect(mockApiFetch).toHaveBeenCalledWith('/api/v1/search', {
+      method: 'GET',
+      query: {
+        q: 'cat',
+        type: 'hashtags',
+        cursor: 'cursor-hashtags-1',
+        limit: 8,
+      },
+      headers: expect.any(Headers),
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) {
+      throw new Error('expected successful result')
+    }
+
+    expect(result.data.mode).toBe('hashtags')
+    expect(result.data.hashtags.items).toEqual([
+      {
+        tag: 'cats',
+        postCount: 99,
+      },
+    ])
+    expect(result.data.cursors.hashtags).toBe('cursor-hashtags-2')
+  })
+
+  it('binds type=all with per-bucket limits and cursors', async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      requestId: 'req-search-all',
+      data: {
+        query: 'cat',
+        type: 'all',
+        agents: {
+          items: [
+            {
+              id: 'agent-7',
+              name: 'cat_followed',
+              claimed: false,
+              follower_count: 40,
+              following_count: 12,
+            },
+          ],
+          next_cursor: 'agents-cursor-next',
+          has_more: true,
+        },
+        hashtags: {
+          items: [
+            {
+              tag: 'catmemes',
+              post_count: 11,
+            },
+          ],
+          next_cursor: 'hashtags-cursor-next',
+          has_more: true,
+        },
+        posts: {
+          items: [
+            {
+              id: 'post-7',
+              caption: 'cat meme',
+              hashtags: ['catmemes'],
+              images: [{ url: 'https://cdn.example.com/cat-meme.jpg' }],
+              author: { name: 'cat_followed' },
+              is_sensitive: false,
+              report_score: 0.1,
+              like_count: 2,
+              comment_count: 0,
+              created_at: '2026-02-09T21:00:00.000Z',
+            },
+          ],
+          next_cursor: 'posts-cursor-next',
+          has_more: true,
+        },
+      },
+    })
+
+    const result = await searchUnified({
+      text: 'cat',
+      type: 'all',
+      cursors: {
+        agents: 'agents-cursor-1',
+        hashtags: 'hashtags-cursor-1',
+        posts: 'posts-cursor-1',
+      },
+      limits: {
+        agents: 4,
+        hashtags: 3,
+        posts: 12,
+      },
+    })
+
+    expect(mockApiFetch).toHaveBeenCalledWith('/api/v1/search', {
+      method: 'GET',
+      query: {
+        q: 'cat',
+        type: 'all',
+        agents_cursor: 'agents-cursor-1',
+        hashtags_cursor: 'hashtags-cursor-1',
+        posts_cursor: 'posts-cursor-1',
+        agents_limit: 4,
+        hashtags_limit: 3,
+        posts_limit: 12,
+      },
+      headers: expect.any(Headers),
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) {
+      throw new Error('expected successful result')
+    }
+
     expect(result).toMatchObject({
       ok: true,
       data: {
         mode: 'all',
-        contractPlaceholder:
-          'Agents/hashtags bucket bindings are waiting for finalized C1 unified-search contracts.',
+        query: 'cat',
+        cursors: {
+          agents: 'agents-cursor-next',
+          hashtags: 'hashtags-cursor-next',
+          posts: 'posts-cursor-next',
+        },
+        agents: {
+          hasMore: true,
+        },
+        hashtags: {
+          hasMore: true,
+        },
+        posts: {
+          hasMore: true,
+        },
       },
     })
   })
 
-  it('returns local placeholder state for agents/hashtags without binding unfinished C1 contracts', async () => {
-    const result = await searchUnified({
-      text: 'agent',
-      type: 'agents',
-      cursor: 'legacy-post-cursor',
-      cursors: {
-        agents: 'cursor-agents-1',
+  it('uses C1 default all-bucket limits when not provided', async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      requestId: 'req-search-all-default-limits',
+      data: {
+        query: 'cat',
+        type: 'all',
+        agents: {
+          items: [],
+          has_more: false,
+        },
+        hashtags: {
+          items: [],
+          has_more: false,
+        },
+        posts: {
+          items: [],
+          has_more: false,
+        },
       },
     })
 
-    expect(mockApiFetch).not.toHaveBeenCalled()
-    expect(result).toMatchObject({
-      ok: true,
-      data: {
-        mode: 'agents',
-        posts: {
-          posts: [],
-        },
-        agents: {
-          items: [],
-        },
-        cursors: {
-          agents: 'cursor-agents-1',
-          posts: 'legacy-post-cursor',
-        },
-        contractPlaceholder:
-          'Search bucket bindings are waiting for finalized C1 unified-search contracts.',
-      },
+    await searchUnified({
+      text: 'cat',
+      type: 'all',
     })
+
+    expect(mockApiFetch).toHaveBeenCalledWith(
+      '/api/v1/search',
+      expect.objectContaining({
+        query: expect.objectContaining({
+          q: 'cat',
+          type: 'all',
+          agents_limit: 5,
+          hashtags_limit: 5,
+          posts_limit: 15,
+        }),
+      }),
+    )
   })
 })

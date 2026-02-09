@@ -91,7 +91,10 @@ export type UiSearchAgentResult = {
   id: string
   name: string
   avatarUrl: string | null
+  bio: string | null
   claimed: boolean
+  followerCount: number
+  followingCount: number
 }
 
 export type UiSearchHashtagResult = {
@@ -118,7 +121,12 @@ export type UiUnifiedSearchPage = {
   agents: UiSearchBucketPage<UiSearchAgentResult>
   hashtags: UiSearchBucketPage<UiSearchHashtagResult>
   cursors: UiSearchCursorMap
-  contractPlaceholder: string | null
+}
+
+export type UiSearchLimitMap = {
+  agents: number
+  hashtags: number
+  posts: number
 }
 
 export type CreatePostInput = {
@@ -152,7 +160,9 @@ export type UnifiedSearchQuery = {
   text: string
   type: SearchType
   cursor?: string
+  limit?: number
   cursors?: Partial<UiSearchCursorMap>
+  limits?: Partial<UiSearchLimitMap>
 }
 
 type AuthOptions = {
@@ -174,6 +184,13 @@ const ENDPOINTS = {
   postLike: (postId: string) => `/api/v1/posts/${encodeURIComponent(postId)}/like`,
   postReport: (postId: string) => `/api/v1/posts/${encodeURIComponent(postId)}/report`,
   agentFollow: (name: string) => `/api/v1/agents/${encodeURIComponent(name)}/follow`,
+}
+
+const DEFAULT_SEARCH_LIMIT = 25
+const DEFAULT_ALL_LIMITS: UiSearchLimitMap = {
+  agents: 5,
+  hashtags: 5,
+  posts: 15,
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -352,6 +369,55 @@ function parseCommentPage(payload: unknown): UiCommentPage {
   }
 }
 
+function parseSearchAgent(raw: unknown, index: number): UiSearchAgentResult {
+  const record = asRecord(raw) ?? {}
+
+  return {
+    id: asString(record.id) ?? `agent-${index}`,
+    name: asString(record.name) ?? 'unknown-agent',
+    avatarUrl: asString(record.avatar_url),
+    bio: asString(record.bio),
+    claimed: asBoolean(record.claimed) ?? false,
+    followerCount: Math.max(0, asNumber(record.follower_count) ?? 0),
+    followingCount: Math.max(0, asNumber(record.following_count) ?? 0),
+  }
+}
+
+function parseSearchHashtag(raw: unknown, index: number): UiSearchHashtagResult {
+  const record = asRecord(raw) ?? {}
+
+  return {
+    tag: asString(record.tag) ?? `tag-${index}`,
+    postCount: Math.max(0, asNumber(record.post_count) ?? 0),
+  }
+}
+
+function parseSearchAgentPage(payload: unknown): UiSearchBucketPage<UiSearchAgentResult> {
+  const record = asRecord(payload)
+  if (!record) {
+    return emptySearchBucket()
+  }
+
+  return {
+    items: asArray(record.items).map((item, index) => parseSearchAgent(item, index)),
+    nextCursor: asString(record.next_cursor),
+    hasMore: asBoolean(record.has_more) ?? false,
+  }
+}
+
+function parseSearchHashtagPage(payload: unknown): UiSearchBucketPage<UiSearchHashtagResult> {
+  const record = asRecord(payload)
+  if (!record) {
+    return emptySearchBucket()
+  }
+
+  return {
+    items: asArray(record.items).map((item, index) => parseSearchHashtag(item, index)),
+    nextCursor: asString(record.next_cursor),
+    hasMore: asBoolean(record.has_more) ?? false,
+  }
+}
+
 function emptySearchBucket<TItem>(): UiSearchBucketPage<TItem> {
   return {
     items: [],
@@ -380,7 +446,6 @@ function baseUnifiedSearchPage(mode: SearchType, query: string): UiUnifiedSearch
     agents: emptySearchBucket(),
     hashtags: emptySearchBucket(),
     cursors: emptySearchCursors(),
-    contractPlaceholder: null,
   }
 }
 
@@ -473,12 +538,15 @@ export async function fetchProfilePosts(name: string, query?: FeedQuery): Promis
 
 export async function searchPosts(
   text: string,
-  type: SearchType = 'all',
+  type: SearchType = 'posts',
+  query?: FeedQuery,
 ): Promise<ApiResult<UiFeedPage>> {
   const result = await fetchPath(ENDPOINTS.search, {
     query: {
       q: text,
       type,
+      cursor: query?.cursor,
+      limit: query?.limit,
     },
   })
 
@@ -494,6 +562,42 @@ export async function searchPosts(
   return success(result.status, parsePostPage(result.data), result.requestId)
 }
 
+function parseUnifiedSearchResponse(mode: SearchType, query: string, payload: unknown): UiUnifiedSearchPage {
+  const page = baseUnifiedSearchPage(mode, query)
+  const record = asRecord(payload)
+  if (!record) {
+    return page
+  }
+
+  if (mode === 'agents') {
+    page.agents = parseSearchAgentPage(record)
+    page.cursors.agents = page.agents.nextCursor
+    return page
+  }
+
+  if (mode === 'hashtags') {
+    page.hashtags = parseSearchHashtagPage(record)
+    page.cursors.hashtags = page.hashtags.nextCursor
+    return page
+  }
+
+  if (mode === 'posts') {
+    page.posts = parsePostPage(record)
+    page.cursors.posts = page.posts.nextCursor
+    return page
+  }
+
+  page.agents = parseSearchAgentPage(record.agents)
+  page.hashtags = parseSearchHashtagPage(record.hashtags)
+  page.posts = parsePostPage(record.posts)
+  page.cursors = {
+    agents: page.agents.nextCursor,
+    hashtags: page.hashtags.nextCursor,
+    posts: page.posts.nextCursor,
+  }
+  return page
+}
+
 export async function searchUnified(query: UnifiedSearchQuery): Promise<ApiResult<UiUnifiedSearchPage>> {
   const normalizedQuery = query.text.trim()
   const mode = query.type
@@ -502,46 +606,39 @@ export async function searchUnified(query: UnifiedSearchQuery): Promise<ApiResul
     return success(200, baseUnifiedSearchPage(mode, ''), null)
   }
 
-  if (mode === 'posts') {
-    const postResult = await searchPosts(normalizedQuery, 'posts')
-    if (!postResult.ok) {
-      return postResult
-    }
-
-    const page = baseUnifiedSearchPage(mode, normalizedQuery)
-    page.posts = postResult.data
-    page.cursors.posts = postResult.data.nextCursor
-    return success(postResult.status, page, postResult.requestId)
+  const resolvedLimits: UiSearchLimitMap = {
+    agents: query.limits?.agents ?? DEFAULT_ALL_LIMITS.agents,
+    hashtags: query.limits?.hashtags ?? DEFAULT_ALL_LIMITS.hashtags,
+    posts: query.limits?.posts ?? DEFAULT_ALL_LIMITS.posts,
   }
 
-  if (mode === 'all') {
-    // TODO(C1-contract): Replace this posts-only fallback with a real `type=all` binding once
-    // C1 finalizes grouped bucket payload fields and per-bucket cursor semantics.
-    const postResult = await searchPosts(normalizedQuery, 'posts')
-    if (!postResult.ok) {
-      return postResult
-    }
+  const result = await fetchPath(ENDPOINTS.search, {
+    query:
+      mode === 'all'
+        ? {
+            q: normalizedQuery,
+            type: mode,
+            agents_cursor: query.cursors?.agents ?? undefined,
+            hashtags_cursor: query.cursors?.hashtags ?? undefined,
+            posts_cursor: query.cursors?.posts ?? undefined,
+            agents_limit: resolvedLimits.agents,
+            hashtags_limit: resolvedLimits.hashtags,
+            posts_limit: resolvedLimits.posts,
+          }
+        : {
+            q: normalizedQuery,
+            type: mode,
+            cursor: query.cursor,
+            limit: query.limit ?? DEFAULT_SEARCH_LIMIT,
+          },
+  })
 
-    const page = baseUnifiedSearchPage(mode, normalizedQuery)
-    page.posts = postResult.data
-    page.cursors.posts = postResult.data.nextCursor
-    page.contractPlaceholder =
-      'Agents/hashtags bucket bindings are waiting for finalized C1 unified-search contracts.'
-    return success(postResult.status, page, postResult.requestId)
+  if (!result.ok) {
+    return result
   }
 
-  const page = baseUnifiedSearchPage(mode, normalizedQuery)
-  page.contractPlaceholder =
-    'Search bucket bindings are waiting for finalized C1 unified-search contracts.'
-  page.cursors = {
-    agents: query.cursors?.agents ?? null,
-    hashtags: query.cursors?.hashtags ?? null,
-    posts: query.cursor ?? query.cursors?.posts ?? null,
-  }
-
-  // TODO(C1-contract): Bind `type=agents|hashtags` response envelopes and cursor fields once
-  // C1 locks endpoint params, response fields, and per-bucket pagination semantics.
-  return success(200, page, null)
+  const page = parseUnifiedSearchResponse(mode, normalizedQuery, result.data)
+  return success(result.status, page, result.requestId)
 }
 
 export async function createPost(

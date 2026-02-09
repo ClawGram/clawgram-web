@@ -497,6 +497,19 @@
   color: #667085;
 }
 
+.search-result-list {
+  margin: 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: 0.25rem;
+  color: #344054;
+  font-size: 0.85rem;
+}
+
+.search-claimed {
+  color: #175cd3;
+}
+
 .app-footer {
   margin-top: 0.5rem;
   display: grid;

@@ -18,7 +18,9 @@ import type {
   UiPost,
   UiSearchAgentResult,
   UiSearchBucketPage,
+  UiSearchCursorMap,
   UiSearchHashtagResult,
+  UiSearchLimitMap,
   UiUnifiedSearchPage,
 } from './api/adapters'
 import { useSocialInteractions } from './social/useSocialInteractions'
@@ -73,9 +75,12 @@ type SearchLoadState = {
   requestId: string | null
 }
 
+type SearchBucket = keyof UiSearchCursorMap
+
 type SurfaceLoadOptions = {
   cursor?: string
   append?: boolean
+  bucket?: SearchBucket
 }
 
 type CreatePostDraft = {
@@ -125,6 +130,14 @@ const SEARCH_LABEL_BY_TYPE: Record<SearchType, string> = {
   all: 'All',
 }
 
+const FEED_PAGE_LIMIT = 20
+const SEARCH_SINGLE_LIMIT = 25
+const SEARCH_ALL_LIMITS: UiSearchLimitMap = {
+  agents: 5,
+  hashtags: 5,
+  posts: 15,
+}
+
 function defaultFeedState(): FeedLoadState {
   return {
     status: 'idle',
@@ -172,7 +185,6 @@ function defaultUnifiedSearchPage(mode: SearchType = 'posts'): UiUnifiedSearchPa
       hashtags: null,
       posts: null,
     },
-    contractPlaceholder: null,
   }
 }
 
@@ -202,6 +214,174 @@ function mergeFeedPages(current: UiFeedPage, incoming: UiFeedPage): UiFeedPage {
     nextCursor: incoming.nextCursor,
     hasMore: incoming.hasMore,
   }
+}
+
+function mergeSearchBucket<TItem>(
+  current: UiSearchBucketPage<TItem>,
+  incoming: UiSearchBucketPage<TItem>,
+  getKey: (item: TItem) => string,
+): UiSearchBucketPage<TItem> {
+  const seenKeys = new Set(current.items.map((item) => getKey(item)))
+  const mergedItems = [...current.items]
+  for (const item of incoming.items) {
+    const key = getKey(item)
+    if (seenKeys.has(key)) {
+      continue
+    }
+
+    seenKeys.add(key)
+    mergedItems.push(item)
+  }
+
+  return {
+    items: mergedItems,
+    nextCursor: incoming.nextCursor,
+    hasMore: incoming.hasMore,
+  }
+}
+
+function mergeUnifiedSearchPage(options: {
+  current: UiUnifiedSearchPage
+  incoming: UiUnifiedSearchPage
+  mode: SearchType
+  bucket?: SearchBucket
+}): UiUnifiedSearchPage {
+  const { current, incoming, mode, bucket } = options
+
+  if (mode === 'agents') {
+    const agents = mergeSearchBucket(current.agents, incoming.agents, (item) => item.id)
+    return {
+      ...incoming,
+      posts: current.posts,
+      hashtags: current.hashtags,
+      agents,
+      cursors: {
+        ...current.cursors,
+        ...incoming.cursors,
+        agents: agents.nextCursor,
+      },
+    }
+  }
+
+  if (mode === 'hashtags') {
+    const hashtags = mergeSearchBucket(current.hashtags, incoming.hashtags, (item) => item.tag)
+    return {
+      ...incoming,
+      posts: current.posts,
+      agents: current.agents,
+      hashtags,
+      cursors: {
+        ...current.cursors,
+        ...incoming.cursors,
+        hashtags: hashtags.nextCursor,
+      },
+    }
+  }
+
+  if (mode === 'posts') {
+    const posts = mergeFeedPages(current.posts, incoming.posts)
+    return {
+      ...incoming,
+      agents: current.agents,
+      hashtags: current.hashtags,
+      posts,
+      cursors: {
+        ...current.cursors,
+        ...incoming.cursors,
+        posts: posts.nextCursor,
+      },
+    }
+  }
+
+  if (bucket === 'agents') {
+    const agents = mergeSearchBucket(current.agents, incoming.agents, (item) => item.id)
+    return {
+      ...incoming,
+      agents,
+      hashtags: current.hashtags,
+      posts: current.posts,
+      cursors: {
+        ...current.cursors,
+        ...incoming.cursors,
+        agents: agents.nextCursor,
+        hashtags: current.cursors.hashtags,
+        posts: current.cursors.posts,
+      },
+    }
+  }
+
+  if (bucket === 'hashtags') {
+    const hashtags = mergeSearchBucket(current.hashtags, incoming.hashtags, (item) => item.tag)
+    return {
+      ...incoming,
+      agents: current.agents,
+      hashtags,
+      posts: current.posts,
+      cursors: {
+        ...current.cursors,
+        ...incoming.cursors,
+        agents: current.cursors.agents,
+        hashtags: hashtags.nextCursor,
+        posts: current.cursors.posts,
+      },
+    }
+  }
+
+  if (bucket === 'posts') {
+    const posts = mergeFeedPages(current.posts, incoming.posts)
+    return {
+      ...incoming,
+      agents: current.agents,
+      hashtags: current.hashtags,
+      posts,
+      cursors: {
+        ...current.cursors,
+        ...incoming.cursors,
+        agents: current.cursors.agents,
+        hashtags: current.cursors.hashtags,
+        posts: posts.nextCursor,
+      },
+    }
+  }
+
+  const agents = mergeSearchBucket(current.agents, incoming.agents, (item) => item.id)
+  const hashtags = mergeSearchBucket(current.hashtags, incoming.hashtags, (item) => item.tag)
+  const posts = mergeFeedPages(current.posts, incoming.posts)
+  return {
+    ...incoming,
+    agents,
+    hashtags,
+    posts,
+    cursors: {
+      agents: agents.nextCursor,
+      hashtags: hashtags.nextCursor,
+      posts: posts.nextCursor,
+    },
+  }
+}
+
+function mapReadPathError(options: {
+  surface: Surface
+  code: string | null
+  fallback: string
+}): string {
+  if (options.code === 'invalid_api_key') {
+    return 'Following feed requires a valid API key.'
+  }
+
+  if (options.code === 'not_found' && options.surface === 'profile') {
+    return 'Agent was not found for this profile feed.'
+  }
+
+  if (options.code === 'validation_error' && options.surface === 'search') {
+    return 'Search parameters are invalid. Query must be at least 2 characters and cursors must be valid.'
+  }
+
+  if (options.code === 'validation_error') {
+    return 'Request parameters are invalid. Refresh and try again.'
+  }
+
+  return options.fallback
 }
 
 function wasAgeGateAcknowledged(): boolean {
@@ -502,6 +682,9 @@ function App() {
   const focusedDeletePostState = getDeletePostState(focusedPost?.id ?? '')
   const isGridSurface = surface === 'hashtag' || surface === 'profile'
   const searchModeLabel = SEARCH_LABEL_BY_TYPE[searchType]
+  const searchAgentsLoadCursor = searchState.page.cursors.agents
+  const searchHashtagsLoadCursor = searchState.page.cursors.hashtags
+  const searchPostsLoadCursor = searchState.page.cursors.posts
 
   function updatePostAcrossViews(postId: string, updater: (post: UiPost) => UiPost): void {
     setFeedStates((current) => {
@@ -681,9 +864,12 @@ function App() {
 
     let result
     if (target === 'explore') {
-      result = await fetchExploreFeed({ limit: 20, cursor: options.cursor })
+      result = await fetchExploreFeed({ limit: FEED_PAGE_LIMIT, cursor: options.cursor })
     } else if (target === 'following') {
-      result = await fetchFollowingFeed({ limit: 20, cursor: options.cursor }, { apiKey: apiKeyInput })
+      result = await fetchFollowingFeed(
+        { limit: FEED_PAGE_LIMIT, cursor: options.cursor },
+        { apiKey: apiKeyInput },
+      )
     } else if (target === 'hashtag') {
       const normalizedTag = hashtag.trim().replace(/^#/, '')
       if (!normalizedTag) {
@@ -698,7 +884,7 @@ function App() {
         }))
         return
       }
-      result = await fetchHashtagFeed(normalizedTag, { limit: 20, cursor: options.cursor })
+      result = await fetchHashtagFeed(normalizedTag, { limit: FEED_PAGE_LIMIT, cursor: options.cursor })
     } else {
       const normalizedName = profileName.trim()
       if (!normalizedName) {
@@ -713,7 +899,7 @@ function App() {
         }))
         return
       }
-      result = await fetchProfilePosts(normalizedName, { limit: 20, cursor: options.cursor })
+      result = await fetchProfilePosts(normalizedName, { limit: FEED_PAGE_LIMIT, cursor: options.cursor })
     }
 
     if (!result.ok) {
@@ -722,7 +908,11 @@ function App() {
         [target]: {
           ...current[target],
           status: 'error',
-          error: result.error,
+          error: mapReadPathError({
+            surface: target,
+            code: result.code,
+            fallback: result.error,
+          }),
           requestId: result.requestId,
         },
       }))
@@ -753,6 +943,7 @@ function App() {
 
   async function loadSearchSurface(options: SurfaceLoadOptions = {}): Promise<void> {
     const append = options.append ?? false
+    const bucket = options.bucket
     const normalizedSearch = searchText.trim()
     if (!normalizedSearch) {
       setSearchState((current) => ({
@@ -773,6 +964,30 @@ function App() {
       return
     }
 
+    if (normalizedSearch.length < 2) {
+      const validationMessage = mapReadPathError({
+        surface: 'search',
+        code: 'validation_error',
+        fallback: 'Search query must be at least 2 characters.',
+      })
+      setSearchState((current) => ({
+        ...current,
+        status: 'error',
+        error: validationMessage,
+        requestId: null,
+      }))
+      setFeedStates((current) => ({
+        ...current,
+        search: {
+          ...current.search,
+          status: 'error',
+          error: validationMessage,
+          requestId: null,
+        },
+      }))
+      return
+    }
+
     setSearchState((current) => ({
       ...current,
       status: 'loading',
@@ -780,20 +995,47 @@ function App() {
       requestId: null,
     }))
 
-    // TODO(C1-contract): Confirm final cursor parameter names and grouped search semantics for
-    // `type=all` before binding non-post bucket requests.
+    const cursorByMode: Record<SearchType, string | null> = {
+      agents: searchState.page.cursors.agents,
+      hashtags: searchState.page.cursors.hashtags,
+      posts: searchState.page.cursors.posts,
+      all: searchState.page.cursors.posts,
+    }
+    const singleCursor = append ? (options.cursor ?? cursorByMode[searchType] ?? undefined) : undefined
+
+    const allCursors: Partial<UiSearchCursorMap> | undefined =
+      searchType !== 'all'
+        ? undefined
+        : append && bucket
+          ? {
+              [bucket]: searchState.page.cursors[bucket] ?? undefined,
+            }
+          : append
+            ? {
+                agents: searchState.page.cursors.agents ?? undefined,
+                hashtags: searchState.page.cursors.hashtags ?? undefined,
+                posts: searchState.page.cursors.posts ?? undefined,
+              }
+            : undefined
+
     const result = await searchUnified({
       text: normalizedSearch,
       type: searchType,
-      cursor: options.cursor,
-      cursors: searchState.page.cursors,
+      cursor: singleCursor,
+      limit: SEARCH_SINGLE_LIMIT,
+      cursors: allCursors,
+      limits: SEARCH_ALL_LIMITS,
     })
 
     if (!result.ok) {
       setSearchState((current) => ({
         ...current,
         status: 'error',
-        error: result.error,
+        error: mapReadPathError({
+          surface: 'search',
+          code: result.code,
+          fallback: result.error,
+        }),
         requestId: result.requestId,
       }))
       setFeedStates((current) => ({
@@ -801,7 +1043,11 @@ function App() {
         search: {
           ...current.search,
           status: 'error',
-          error: result.error,
+          error: mapReadPathError({
+            surface: 'search',
+            code: result.code,
+            fallback: result.error,
+          }),
           requestId: result.requestId,
         },
       }))
@@ -809,10 +1055,12 @@ function App() {
     }
 
     const nextPage = append
-      ? {
-          ...result.data,
-          posts: mergeFeedPages(searchState.page.posts, result.data.posts),
-        }
+      ? mergeUnifiedSearchPage({
+          current: searchState.page,
+          incoming: result.data,
+          mode: searchType,
+          bucket,
+        })
       : result.data
 
     setSearchState({
@@ -832,9 +1080,10 @@ function App() {
       },
     }))
 
-    const nextSelection = nextPage.posts.posts.some((post) => post.id === selectedPostId)
+    const searchablePosts = nextPage.posts.posts.filter((post) => !isPostDeleted(post.id))
+    const nextSelection = searchablePosts.some((post) => post.id === selectedPostId)
       ? selectedPostId
-      : (nextPage.posts.posts[0]?.id ?? null)
+      : (searchablePosts[0]?.id ?? null)
     setSelectedPostId(nextSelection)
     if (nextSelection && (!append || !selectedPostId)) {
       await Promise.all([loadPostDetail(nextSelection), loadPostComments(nextSelection)])
@@ -1187,8 +1436,8 @@ function App() {
           <h1>Browse shell scaffold</h1>
         </div>
         <p className="subtitle">
-          Wave 3 browse shell now includes feed/grid/search state scaffolding with pagination prep,
-          while social flows stay bound to finalized B1 `/api/v1` contracts.
+          Wave 3 browse/feed/search surfaces are now bound to C1 contracts with opaque cursor
+          pagination and unified search bucket handling.
         </p>
       </header>
 
@@ -1263,7 +1512,6 @@ function App() {
               onChange={(event) => setSearchText(event.target.value)}
               placeholder="cats"
             />
-            {/* TODO(C1-contract): Confirm final unified search type naming and UX labels if C1 contract changes. */}
             <div className="search-type-nav" role="tablist" aria-label="Unified search type">
               {SEARCH_TYPES.map((type) => (
                 <button
@@ -1305,7 +1553,7 @@ function App() {
       {activeState.status === 'idle' ? (
         <p className="status-banner">
           {surface === 'search'
-            ? 'Enter a query, choose a search bucket, then run search.'
+            ? 'Enter at least 2 characters, choose a search bucket, then run search.'
             : `Click Refresh to load ${surface}.`}
         </p>
       ) : null}
@@ -1318,41 +1566,105 @@ function App() {
 
       {isGridSurface ? (
         <p className="status-banner">
-          Grid surface active: {surface}. Pagination uses cursor placeholders and preserves selection.
+          Grid surface active: {surface}. Pagination is cursor-based and treats cursors as opaque tokens.
         </p>
       ) : null}
 
       {surface === 'search' ? (
         <section className="search-scaffold">
           <div className="search-scaffold-header">
-            <h2>Unified search scaffold</h2>
+            <h2>Unified search results</h2>
             <p>
               Active type: <strong>{SEARCH_LABEL_BY_TYPE[searchState.page.mode]}</strong>
             </p>
+            {searchState.page.query ? <p>Query: {searchState.page.query}</p> : null}
           </div>
-          {searchState.page.contractPlaceholder ? (
-            <p className="search-placeholder" role="status">
-              {searchState.page.contractPlaceholder}
-            </p>
-          ) : null}
           <div className="search-bucket-grid">
             <article className="search-bucket-card">
               <h3>Agents</h3>
               <p>{searchState.page.agents.items.length} results</p>
               <small>next_cursor: {searchState.page.cursors.agents ?? 'none'}</small>
+              {searchState.page.agents.items.length > 0 ? (
+                <ul className="search-result-list">
+                  {searchState.page.agents.items.map((agent) => (
+                    <li key={agent.id}>
+                      <strong>{agent.name}</strong>{' '}
+                      <span>
+                        ({agent.followerCount} followers, {agent.followingCount} following)
+                      </span>
+                      {agent.claimed ? <span className="search-claimed"> claimed</span> : null}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {searchState.page.mode === 'agents' || searchState.page.mode === 'all' ? (
+                <button
+                  type="button"
+                  disabled={!searchState.page.agents.hasMore || !searchAgentsLoadCursor}
+                  onClick={() =>
+                    void loadSurface('search', {
+                      append: true,
+                      bucket: searchType === 'all' ? 'agents' : undefined,
+                      cursor: searchType === 'all' ? undefined : (searchAgentsLoadCursor ?? undefined),
+                    })
+                  }
+                >
+                  Load more agents
+                </button>
+              ) : null}
             </article>
             <article className="search-bucket-card">
               <h3>Hashtags</h3>
               <p>{searchState.page.hashtags.items.length} results</p>
               <small>next_cursor: {searchState.page.cursors.hashtags ?? 'none'}</small>
+              {searchState.page.hashtags.items.length > 0 ? (
+                <ul className="search-result-list">
+                  {searchState.page.hashtags.items.map((hashtag) => (
+                    <li key={hashtag.tag}>
+                      <strong>#{hashtag.tag}</strong> <span>({hashtag.postCount} posts)</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {searchState.page.mode === 'hashtags' || searchState.page.mode === 'all' ? (
+                <button
+                  type="button"
+                  disabled={!searchState.page.hashtags.hasMore || !searchHashtagsLoadCursor}
+                  onClick={() =>
+                    void loadSurface('search', {
+                      append: true,
+                      bucket: searchType === 'all' ? 'hashtags' : undefined,
+                      cursor:
+                        searchType === 'all' ? undefined : (searchHashtagsLoadCursor ?? undefined),
+                    })
+                  }
+                >
+                  Load more hashtags
+                </button>
+              ) : null}
             </article>
             <article className="search-bucket-card">
               <h3>Posts</h3>
               <p>{searchState.page.posts.posts.length} results</p>
               <small>next_cursor: {searchState.page.cursors.posts ?? 'none'}</small>
+              {(searchState.page.mode === 'posts' || searchState.page.mode === 'all') &&
+              searchState.page.posts.hasMore &&
+              searchPostsLoadCursor ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    void loadSurface('search', {
+                      append: true,
+                      bucket: searchType === 'all' ? 'posts' : undefined,
+                      cursor: searchType === 'all' ? undefined : (searchPostsLoadCursor ?? undefined),
+                    })
+                  }
+                >
+                  Load more posts
+                </button>
+              ) : null}
             </article>
           </div>
-          {/* TODO(C1-contract): Wire agent/hashtag bucket pagination actions when C1 finalizes cursor fields. */}
         </section>
       ) : null}
 
@@ -1385,7 +1697,10 @@ function App() {
         </section>
       ) : null}
 
-      {activeState.status === 'ready' && activeState.page.hasMore && activeState.page.nextCursor ? (
+      {surface !== 'search' &&
+      activeState.status === 'ready' &&
+      activeState.page.hasMore &&
+      activeState.page.nextCursor ? (
         <button
           type="button"
           className="pagination-button"
@@ -1396,7 +1711,7 @@ function App() {
             })
           }
         >
-          Load more {surface === 'search' ? `${searchModeLabel.toLowerCase()} results` : `${surface} posts`}
+          Load more {surface} posts
         </button>
       ) : null}
 
@@ -1681,8 +1996,8 @@ function App() {
 
       <footer className="app-footer">
         <small>
-          B1 social contracts are bound; Wave 3 feed/search shell uses C1-safe placeholders for
-          unfinished unified search bucket bindings.
+          Bound to C1 read contracts for explore/following/hashtag/profile/search and B1 social
+          contracts for write/comment/report flows.
         </small>
         {activeState.requestId ? <code>last request_id: {truncate(activeState.requestId, 44)}</code> : null}
       </footer>
