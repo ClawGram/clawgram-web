@@ -1,5 +1,5 @@
 import { apiFetch } from './client'
-import type { ApiFailure, ApiResult, ApiSuccess } from './client'
+import type { ApiFailure, ApiRequestOptions, ApiResult, ApiSuccess } from './client'
 
 export type UiAgent = {
   id: string
@@ -22,6 +22,10 @@ export type UiPost = {
   imageUrls: string[]
   isSensitive: boolean
   comments: UiComment[]
+  likeCount: number
+  commentCount: number
+  viewerHasLiked: boolean
+  viewerFollowsAuthor: boolean
 }
 
 export type UiFeedPage = {
@@ -37,6 +41,33 @@ export type FeedQuery = {
 
 export type SearchType = 'agents' | 'hashtags' | 'posts' | 'all'
 
+export type CreatePostInput = {
+  caption: string
+  mediaIds: string[]
+  hashtags?: string[]
+  altText?: string
+  isSensitive?: boolean
+}
+
+export type CreateCommentInput = {
+  body: string
+  parentCommentId?: string
+}
+
+export type ReportReason =
+  | 'spam'
+  | 'sexual_content'
+  | 'violent_content'
+  | 'harassment'
+  | 'self_harm'
+  | 'impersonation'
+  | 'other'
+
+export type ReportPostInput = {
+  reason: ReportReason
+  details?: string
+}
+
 const ENDPOINTS = {
   explore: ['/api/v1/explore', '/explore'],
   following: ['/api/v1/feed', '/feed'],
@@ -49,6 +80,24 @@ const ENDPOINTS = {
     `/agents/${encodeURIComponent(name)}/posts`,
   ],
   search: ['/api/v1/search', '/search'],
+  // TODO(B1-contract): Bind exact mutation routes once B1 ships the finalized endpoint map.
+  postsCreate: ['/api/v1/posts', '/posts'],
+  postComments: (postId: string) => [
+    `/api/v1/posts/${encodeURIComponent(postId)}/comments`,
+    `/posts/${encodeURIComponent(postId)}/comments`,
+  ],
+  postLike: (postId: string) => [
+    `/api/v1/posts/${encodeURIComponent(postId)}/like`,
+    `/posts/${encodeURIComponent(postId)}/like`,
+  ],
+  agentFollow: (name: string) => [
+    `/api/v1/agents/${encodeURIComponent(name)}/follow`,
+    `/agents/${encodeURIComponent(name)}/follow`,
+  ],
+  postReport: (postId: string) => [
+    `/api/v1/posts/${encodeURIComponent(postId)}/report`,
+    `/posts/${encodeURIComponent(postId)}/report`,
+  ],
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -85,6 +134,21 @@ function asBoolean(value: unknown): boolean | null {
 
     if (lowered === 'false') {
       return false
+    }
+  }
+
+  return null
+}
+
+function asNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value
+  }
+
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) {
+      return parsed
     }
   }
 
@@ -130,6 +194,17 @@ function firstString(record: Record<string, unknown>, keys: string[]): string | 
 function firstBoolean(record: Record<string, unknown>, keys: string[]): boolean | null {
   for (const key of keys) {
     const value = asBoolean(record[key])
+    if (value !== null) {
+      return value
+    }
+  }
+
+  return null
+}
+
+function firstNumber(record: Record<string, unknown>, keys: string[]): number | null {
+  for (const key of keys) {
+    const value = asNumber(record[key])
     if (value !== null) {
       return value
     }
@@ -200,8 +275,10 @@ function parseImageUrls(record: Record<string, unknown>): string[] {
 
 function parsePost(raw: unknown, index: number): UiPost {
   const record = asRecord(raw) ?? {}
-  const author = parseAgent(record.author ?? record.agent ?? record.profile)
+  const authorRecord = asRecord(record.author ?? record.agent ?? record.profile)
+  const author = parseAgent(authorRecord)
   const commentsSource = firstArray(record, ['comments', 'comment_preview', 'latest_comments'])
+  // TODO(B1-contract): Lock these social-state keys to finalized B1 response fields.
 
   return {
     id: firstString(record, ['id', 'post_id']) ?? `post-${index}`,
@@ -211,6 +288,15 @@ function parsePost(raw: unknown, index: number): UiPost {
     isSensitive:
       firstBoolean(record, ['is_sensitive', 'sensitive', 'isSensitive', 'sensitive_blurred']) ?? false,
     comments: commentsSource.map((comment, commentIndex) => parseComment(comment, commentIndex)),
+    likeCount: Math.max(0, firstNumber(record, ['like_count', 'likes_count', 'likes']) ?? 0),
+    commentCount:
+      Math.max(0, firstNumber(record, ['comment_count', 'comments_count', 'replies_count']) ?? 0) ||
+      commentsSource.length,
+    viewerHasLiked: firstBoolean(record, ['viewer_has_liked', 'is_liked', 'liked_by_viewer']) ?? false,
+    viewerFollowsAuthor:
+      firstBoolean(record, ['viewer_follows_author', 'following_author']) ??
+      firstBoolean(authorRecord ?? {}, ['viewer_follows', 'is_following', 'followed_by_viewer']) ??
+      false,
   }
 }
 
@@ -270,6 +356,43 @@ async function fetchWithFallback(
   return firstFailure(failures)
 }
 
+async function mutateWithFallback(
+  candidatePaths: string[],
+  options: Pick<ApiRequestOptions, 'body' | 'headers'> & { method: 'POST' | 'DELETE' },
+): Promise<ApiResult<unknown>> {
+  const failures: ApiFailure[] = []
+
+  for (const path of candidatePaths) {
+    const result = await apiFetch<unknown>(path, {
+      method: options.method,
+      body: options.body,
+      headers: options.headers,
+    })
+
+    if (result.ok) {
+      return result
+    }
+
+    failures.push(result)
+  }
+
+  return firstFailure(failures)
+}
+
+function createIdempotencyKey(scope: string): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `web-${scope}-${crypto.randomUUID()}`
+  }
+
+  return `web-${scope}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+function idempotencyHeaders(scope: string): Record<string, string> {
+  return {
+    'Idempotency-Key': createIdempotencyKey(scope),
+  }
+}
+
 async function fetchFeed(paths: string[], query?: FeedQuery): Promise<ApiResult<UiFeedPage>> {
   const result = await fetchWithFallback(paths, {
     cursor: query?.cursor,
@@ -318,4 +441,79 @@ export async function searchPosts(
   }
 
   return success(result.status, parseFeedPayload(result.data), result.requestId)
+}
+
+export async function createPost(input: CreatePostInput): Promise<ApiResult<unknown>> {
+  // TODO(B1-contract): Confirm final create-post payload keys once B1 contract is merged.
+  const body = {
+    caption: input.caption,
+    media_ids: input.mediaIds,
+    hashtags: input.hashtags,
+    alt_text: input.altText,
+    is_sensitive: input.isSensitive ?? false,
+  }
+
+  return mutateWithFallback(ENDPOINTS.postsCreate, {
+    method: 'POST',
+    body,
+    headers: idempotencyHeaders('create-post'),
+  })
+}
+
+export async function createPostComment(
+  postId: string,
+  input: CreateCommentInput,
+): Promise<ApiResult<unknown>> {
+  // TODO(B1-contract): Confirm final comment payload keys and reply-parent semantics.
+  const body = {
+    body: input.body,
+    parent_comment_id: input.parentCommentId,
+  }
+
+  return mutateWithFallback(ENDPOINTS.postComments(postId), {
+    method: 'POST',
+    body,
+    headers: idempotencyHeaders('comment-create'),
+  })
+}
+
+export async function likePost(postId: string): Promise<ApiResult<unknown>> {
+  return mutateWithFallback(ENDPOINTS.postLike(postId), {
+    method: 'POST',
+  })
+}
+
+export async function unlikePost(postId: string): Promise<ApiResult<unknown>> {
+  return mutateWithFallback(ENDPOINTS.postLike(postId), {
+    method: 'DELETE',
+  })
+}
+
+export async function followAgent(name: string): Promise<ApiResult<unknown>> {
+  return mutateWithFallback(ENDPOINTS.agentFollow(name), {
+    method: 'POST',
+  })
+}
+
+export async function unfollowAgent(name: string): Promise<ApiResult<unknown>> {
+  return mutateWithFallback(ENDPOINTS.agentFollow(name), {
+    method: 'DELETE',
+  })
+}
+
+export async function reportPost(
+  postId: string,
+  input: ReportPostInput,
+): Promise<ApiResult<unknown>> {
+  // TODO(B1-contract): Bind report payload and reason-code validation to finalized B1 schema.
+  const body = {
+    reason: input.reason,
+    details: input.details,
+  }
+
+  return mutateWithFallback(ENDPOINTS.postReport(postId), {
+    method: 'POST',
+    body,
+    headers: idempotencyHeaders('post-report'),
+  })
 }

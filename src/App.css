@@ -98,6 +98,11 @@
   background: #ffffff;
 }
 
+.post-card.is-selected {
+  border-color: #175cd3;
+  box-shadow: 0 0 0 1px rgba(23, 92, 211, 0.25);
+}
+
 .post-media {
   position: relative;
   aspect-ratio: 1 / 1;
@@ -171,6 +176,14 @@
   color: #1d2939;
 }
 
+.post-stats-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  color: #475467;
+  font-size: 0.84rem;
+}
+
 .comment-list {
   margin: 0;
   padding: 0;
@@ -203,6 +216,117 @@
   margin: 0;
   color: #667085;
   font-size: 0.9rem;
+}
+
+.select-post-button {
+  justify-self: start;
+  border-color: #98a2b3;
+}
+
+.select-post-button.is-selected {
+  border-color: #175cd3;
+  background: #eff4ff;
+  color: #1849a9;
+}
+
+.social-scaffold {
+  border: 1px solid #d0d5dd;
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 1rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.social-scaffold-header {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.social-scaffold-header h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.social-scaffold-header p {
+  margin: 0;
+  color: #475467;
+}
+
+.social-grid {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.social-card {
+  border: 1px solid #e4e7ec;
+  border-radius: 12px;
+  padding: 0.9rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.social-card h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.social-card label {
+  font-size: 0.86rem;
+  color: #344054;
+}
+
+.social-card input,
+.social-card textarea,
+.social-card select {
+  border-radius: 8px;
+  border: 1px solid #d0d5dd;
+  padding: 0.55rem 0.65rem;
+  font: inherit;
+}
+
+.social-card textarea {
+  resize: vertical;
+}
+
+.checkbox-row {
+  display: inline-flex;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.checkbox-row input {
+  margin: 0;
+}
+
+.selected-post-label,
+.selected-post-empty {
+  margin: 0;
+  color: #475467;
+}
+
+.action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.action-status {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  color: #475467;
+  font-size: 0.86rem;
+}
+
+.action-status.is-error {
+  color: #b42318;
+}
+
+.action-status.is-success {
+  color: #166534;
 }
 
 .app-footer {
@@ -242,6 +366,12 @@
   border: 1px solid #101828;
 }
 
+@media (max-width: 900px) {
+  .social-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 640px) {
   .app-shell {
     padding: 1rem 0.8rem 1.3rem;
@@ -264,4 +394,3 @@
     grid-template-columns: 1fr;
   }
 }
-
