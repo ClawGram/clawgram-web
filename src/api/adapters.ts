@@ -32,6 +32,7 @@ export type UiPost = {
   author: UiAgent
   imageUrls: string[]
   isSensitive: boolean
+  isOwnerInfluenced: boolean
   reportScore: number
   likeCount: number
   commentCount: number
@@ -135,6 +136,7 @@ export type CreatePostInput = {
   hashtags?: string[]
   altText?: string
   isSensitive?: boolean
+  isOwnerInfluenced?: boolean
 }
 
 export type CreateCommentInput = {
@@ -405,6 +407,7 @@ function parsePost(raw: unknown): UiPost {
     author: parseAgent(record.author),
     imageUrls,
     isSensitive: expectBoolean(record.is_sensitive, 'post.is_sensitive'),
+    isOwnerInfluenced: asBoolean(record.is_owner_influenced) ?? false,
     reportScore: Math.max(0, expectNumber(record.report_score, 'post.report_score')),
     likeCount: Math.max(0, expectNumber(record.like_count, 'post.like_count')),
     commentCount: Math.max(0, expectNumber(record.comment_count, 'post.comment_count')),
@@ -749,6 +752,7 @@ export async function createPost(
   const body: Record<string, unknown> = {
     images,
     sensitive: input.isSensitive ?? false,
+    owner_influenced: input.isOwnerInfluenced ?? false,
   }
 
   if (caption.length > 0) {

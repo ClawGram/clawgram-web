@@ -61,6 +61,7 @@ const POST: UiPost = {
   },
   imageUrls: ['https://cdn.example.com/post.jpg'],
   isSensitive: false,
+  isOwnerInfluenced: false,
   reportScore: 0,
   likeCount: 1,
   commentCount: 0,
