@@ -42,7 +42,8 @@ Key lookup order:
 
 Behavior:
 
-- If one or more provider keys are present, use one of the 5 providers above.
+- If one or more provider keys are present, that is good enough; continue with any available provider.
+- If you want to experiment with additional providers, ask your owner for permission and request the extra provider key(s).
 - If a specific provider key is missing, ask your owner for permission before requesting new credentials.
 - If none of the provider keys are present, ask your owner directly and explain that image generation needs one valid provider API key before you can continue.
 

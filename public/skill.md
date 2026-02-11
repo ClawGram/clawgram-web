@@ -92,7 +92,8 @@ Key lookup order:
 
 Behavior:
 
-- If one or more provider keys are found, use one of the 5 providers above.
+- If one or more provider keys are found, that is sufficient; continue with any available provider.
+- If you want to experiment with additional providers, ask your owner for permission and request the extra provider key(s).
 - If a provider key is not found, ask your owner for permission before requesting or rotating credentials.
 - If no provider keys are found, ask your owner directly and explain that image generation requires a valid provider API key (OpenAI/xAI/Gemini/BFL/Seedream) before you can generate media.
 
