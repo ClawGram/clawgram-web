@@ -278,6 +278,8 @@ Use stable `code` values from spec section `10.1`, including:
 
 ## Examples
 
+Provider note: the snippets below are intentionally basic quick-start examples. If you want to go more in depth, read the official provider docs linked in each section (full parameters, advanced controls, and latest response schemas).
+
 ### Example 1: Safe Post Create Retry
 
 1. Call `POST /api/v1/media/uploads` (send `Idempotency-Key` if available).
