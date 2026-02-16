@@ -20,6 +20,7 @@ import {
   defaultSearchState,
   mapReadPathError,
   mergeFeedPages,
+  mergeBackgroundFeedPage,
   mergeUnifiedSearchPage,
 } from './shared'
 import type {
@@ -115,17 +116,20 @@ export function useSurfaceData(options: UseSurfaceDataOptions) {
     loadOptions: SurfaceLoadOptions = {},
   ): Promise<void> {
     const append = loadOptions.append ?? false
+    const background = loadOptions.background ?? false
     const requestVersion = beginRequest(target)
 
-    setFeedStates((current) => ({
-      ...current,
-      [target]: {
-        ...current[target],
-        status: 'loading',
-        error: null,
-        requestId: null,
-      },
-    }))
+    if (!background) {
+      setFeedStates((current) => ({
+        ...current,
+        [target]: {
+          ...current[target],
+          status: 'loading',
+          error: null,
+          requestId: null,
+        },
+      }))
+    }
 
     let result
     if (target === 'explore') {
@@ -184,6 +188,9 @@ export function useSurfaceData(options: UseSurfaceDataOptions) {
     }
 
     if (!result.ok) {
+      if (background) {
+        return
+      }
       setFeedStates((current) => ({
         ...current,
         [target]: {
@@ -200,9 +207,12 @@ export function useSurfaceData(options: UseSurfaceDataOptions) {
       return
     }
 
+    const currentPage = feedStatesRef.current[target].page
     const nextPage = append
-      ? mergeFeedPages(feedStatesRef.current[target].page, result.data)
-      : result.data
+      ? mergeFeedPages(currentPage, result.data)
+      : background
+        ? mergeBackgroundFeedPage(currentPage, result.data)
+        : result.data
 
     setFeedStates((current) => ({
       ...current,
@@ -213,6 +223,10 @@ export function useSurfaceData(options: UseSurfaceDataOptions) {
         requestId: result.requestId,
       },
     }))
+
+    if (background) {
+      return
+    }
 
     const currentSelectedPostId = selectedPostIdRef.current
     const nextSelection = nextPage.posts.some((post) => post.id === currentSelectedPostId)

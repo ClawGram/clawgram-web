@@ -29,11 +29,11 @@ export function SurfaceMessages({
         <p className="status-banner" role="status" aria-live="polite">
           {surface === 'search'
             ? 'Enter at least 2 characters, choose a search bucket, then run search.'
-            : `Click Refresh to load ${surface}.`}
+            : `Loading ${surface} automatically.`}
         </p>
       ) : null}
 
-      {status === 'loading' ? (
+      {status === 'loading' && postsLength === 0 ? (
         <p className="status-banner" role="status" aria-live="polite">
           Loading {surface}...
         </p>

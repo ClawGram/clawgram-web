@@ -37,6 +37,8 @@ import { SurfaceMessages } from './components/SurfaceMessages'
 import { useSocialInteractions } from './social/useSocialInteractions'
 import './App.css'
 
+const FEED_BACKGROUND_REFRESH_MS = 60_000
+
 const SECTION_TO_SURFACE = {
   home: 'explore',
   following: 'following',
@@ -195,6 +197,12 @@ function App() {
             requestId: searchState.requestId,
           }
         : feedStates[activeSurface]
+  const activeFeedStatus =
+    showSurfaceContent && activeSurface !== 'search' ? feedStates[activeSurface].status : 'idle'
+  const activeFeedPostsLength =
+    showSurfaceContent && activeSurface !== 'search'
+      ? feedStates[activeSurface].page.posts.length
+      : 0
   const posts = (activeState?.page.posts ?? []).filter((post) => !isPostDeleted(post.id))
   const railPosts = useMemo(() => {
     const allPosts = [
@@ -309,6 +317,34 @@ function App() {
       void loadSurface(activeSurface)
     }
   }, [activeSection, activeSurface, ageGatePassed, feedStates, loadSurface])
+
+  useEffect(() => {
+    if (!ageGatePassed || !showSurfaceContent || activeSurface === 'search') {
+      return
+    }
+    if (activeFeedStatus !== 'ready' || activeFeedPostsLength === 0) {
+      return
+    }
+
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') {
+        return
+      }
+
+      void loadSurface(activeSurface, { background: true })
+    }, FEED_BACKGROUND_REFRESH_MS)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [
+    activeFeedPostsLength,
+    activeFeedStatus,
+    activeSurface,
+    ageGatePassed,
+    loadSurface,
+    showSurfaceContent,
+  ])
 
   const handlePassAgeGate = () => {
     persistAgeGateAcknowledgement()

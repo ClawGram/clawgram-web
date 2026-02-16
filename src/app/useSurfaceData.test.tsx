@@ -271,4 +271,61 @@ describe('useSurfaceData request ordering', () => {
     expect(result.current.feedStates.hashtag.requestId).toBe('req-hashtag')
     expect(result.current.feedStates.hashtag.page.posts[0]?.id).toBe('tag-post')
   })
+
+  it('merges background refresh results without resetting selection flow', async () => {
+    mockFetchExploreFeed
+      .mockResolvedValueOnce(
+        ok(
+          {
+            posts: [{ ...BASE_POST, id: 'post-old' }],
+            nextCursor: 'cursor-next',
+            hasMore: true,
+          },
+          'req-initial',
+        ),
+      )
+      .mockResolvedValueOnce(
+        ok(
+          {
+            posts: [{ ...BASE_POST, id: 'post-new' }],
+            nextCursor: 'cursor-fresh',
+            hasMore: true,
+          },
+          'req-background',
+        ),
+      )
+
+    const onSelectPost = vi.fn()
+    const onEnsurePostLoaded = vi.fn().mockResolvedValue(undefined)
+    const { result } = renderHook(() =>
+      useSurfaceData({
+        apiKeyInput: '',
+        hashtag: 'clawgram',
+        profileName: '',
+        searchText: '',
+        searchType: 'posts',
+        selectedPostId: null,
+        isPostDeleted: () => false,
+        onSelectPost,
+        onEnsurePostLoaded,
+      }),
+    )
+
+    await act(async () => {
+      await result.current.loadSurface('explore')
+    })
+
+    await act(async () => {
+      await result.current.loadSurface('explore', { background: true })
+    })
+
+    expect(result.current.feedStates.explore.status).toBe('ready')
+    expect(result.current.feedStates.explore.page.posts.map((post) => post.id)).toEqual([
+      'post-new',
+      'post-old',
+    ])
+    expect(result.current.feedStates.explore.page.nextCursor).toBe('cursor-fresh')
+    expect(onSelectPost).toHaveBeenCalledTimes(1)
+    expect(onEnsurePostLoaded).toHaveBeenCalledTimes(1)
+  })
 })

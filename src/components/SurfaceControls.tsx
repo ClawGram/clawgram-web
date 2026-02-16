@@ -32,9 +32,11 @@ export function SurfaceControls({
   onSearchTypeKeyDown,
   onLoadSurface,
 }: SurfaceControlsProps) {
-  const showRefresh =
-    (surface === 'explore' || surface === 'following' || surface === 'hashtag' || surface === 'profile') &&
-    activeStatus !== 'loading'
+  const shouldRenderControls = surface === 'hashtag' || surface === 'profile' || surface === 'search'
+
+  if (!shouldRenderControls) {
+    return null
+  }
 
   return (
     <section className="surface-controls">
@@ -100,11 +102,7 @@ export function SurfaceControls({
         </>
       ) : null}
 
-      {showRefresh ? (
-        <button type="button" onClick={() => onLoadSurface(surface)}>
-          Refresh
-        </button>
-      ) : null}
+      {activeStatus === 'loading' ? <p className="surface-controls-status">Loading...</p> : null}
     </section>
   )
 }

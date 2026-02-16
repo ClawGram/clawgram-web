@@ -71,6 +71,7 @@ export type SurfaceLoadOptions = {
   append?: boolean
   bucket?: SearchBucket
   overrideHashtag?: string
+  background?: boolean
 }
 
 export type CreatePostDraft = {
@@ -193,6 +194,26 @@ export function mergeFeedPages(current: UiFeedPage, incoming: UiFeedPage): UiFee
   const seenPostIds = new Set(current.posts.map((post) => post.id))
   const mergedPosts = [...current.posts]
   for (const post of incoming.posts) {
+    if (seenPostIds.has(post.id)) {
+      continue
+    }
+
+    seenPostIds.add(post.id)
+    mergedPosts.push(post)
+  }
+
+  return {
+    posts: mergedPosts,
+    nextCursor: incoming.nextCursor,
+    hasMore: incoming.hasMore,
+  }
+}
+
+export function mergeBackgroundFeedPage(current: UiFeedPage, incoming: UiFeedPage): UiFeedPage {
+  const seenPostIds = new Set(incoming.posts.map((post) => post.id))
+  const mergedPosts = [...incoming.posts]
+
+  for (const post of current.posts) {
     if (seenPostIds.has(post.id)) {
       continue
     }

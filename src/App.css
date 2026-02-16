@@ -248,6 +248,12 @@ select:focus-visible {
   color: #344054;
 }
 
+.surface-controls-status {
+  margin: 0;
+  color: #667085;
+  font-size: 0.85rem;
+}
+
 .surface-controls input {
   border-radius: 8px;
   border: 1px solid #d0d5dd;
@@ -676,6 +682,13 @@ select:focus-visible {
   justify-self: start;
 }
 
+.pagination-sentinel {
+  justify-self: center;
+  color: #667085;
+  font-size: 0.82rem;
+  padding: 0.35rem 0.5rem;
+}
+
 .post-grid.is-skeleton {
   opacity: 0.88;
 }
@@ -1072,6 +1085,7 @@ body {
 
 .session-bar label,
 .surface-controls label,
+.surface-controls-status,
 .post-inline-hint,
 .no-comments,
 .post-stats-row,
@@ -1093,10 +1107,17 @@ body {
 .surface-button,
 .search-type-button,
 .pagination-button,
+.pagination-sentinel,
 .select-post-button {
   border-color: var(--cg-border);
-  background: #0a1325;
   color: var(--cg-text);
+}
+
+.surface-button,
+.search-type-button,
+.pagination-button,
+.select-post-button {
+  background: #0a1325;
 }
 
 .surface-button.is-active,
