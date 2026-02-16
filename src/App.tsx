@@ -50,11 +50,11 @@ import type {
 } from './app/shared'
 import { AgentConsole } from './components/AgentConsole'
 import { CommentThread } from './components/CommentThread'
-import { FeedSkeleton } from './components/FeedSkeleton'
-import { PostCard } from './components/PostCard'
+import { FeedPostGrid } from './components/FeedPostGrid'
 import { SearchScaffold } from './components/SearchScaffold'
 import { SessionAuthBar } from './components/SessionAuthBar'
 import { SurfaceControls } from './components/SurfaceControls'
+import { SurfaceMessages } from './components/SurfaceMessages'
 import { SurfaceNav } from './components/SurfaceNav'
 import { useSocialInteractions } from './social/useSocialInteractions'
 import './App.css'
@@ -1001,34 +1001,13 @@ function App() {
         onLoadSurface={(target) => void loadSurface(target)}
       />
 
-      {activeState.error ? (
-        <section className="status-banner is-error" role="alert">
-          <span>{activeState.error}</span>
-          {activeState.requestId ? <code>request_id: {activeState.requestId}</code> : null}
-        </section>
-      ) : null}
-
-      {activeState.status === 'idle' ? (
-        <p className="status-banner" role="status" aria-live="polite">
-          {surface === 'search'
-            ? 'Enter at least 2 characters, choose a search bucket, then run search.'
-            : `Click Refresh to load ${surface}.`}
-        </p>
-      ) : null}
-
-      {activeState.status === 'loading' ? (
-        <p className="status-banner" role="status" aria-live="polite">
-          Loading {surface}...
-        </p>
-      ) : null}
-
-      {activeState.status === 'loading' && posts.length === 0 ? <FeedSkeleton /> : null}
-
-      {activeState.status === 'ready' && posts.length === 0 ? (
-        <p className="status-banner" role="status" aria-live="polite">
-          No posts returned for {surface}.
-        </p>
-      ) : null}
+      <SurfaceMessages
+        surface={surface}
+        status={activeState.status}
+        error={activeState.error}
+        requestId={activeState.requestId}
+        postsLength={posts.length}
+      />
 
       {surface === 'search' ? (
         <SearchScaffold
@@ -1041,42 +1020,23 @@ function App() {
         />
       ) : null}
 
-      {posts.length > 0 ? (
-        <section
-          className={`post-grid${isGridSurface ? ' is-grid-surface' : ''}`}
-          aria-live="polite"
-          aria-busy={activeState.status === 'loading'}
-        >
-          {posts.map((post) => {
-            const viewerHasLiked = resolveLikedState(post.id, post.viewerHasLiked)
-            const viewerFollowsAuthor = resolveFollowingState(
-              post.author.name,
-              post.viewerFollowsAuthor,
-            )
-            const isSensitive = resolvePostSensitiveState(post.id, post.isSensitive)
-            const reportScore = resolvePostReportScore(post.id, post.reportScore)
-
-            return (
-              <PostCard
-                key={post.id}
-                post={post}
-                isSensitive={isSensitive}
-                reportScore={reportScore}
-                isSensitiveRevealed={revealedSensitivePostIds.has(post.id)}
-                onRevealSensitive={revealSensitivePost}
-                viewerHasLiked={viewerHasLiked}
-                viewerFollowsAuthor={viewerFollowsAuthor}
-                hasSessionKey={hasSessionKey}
-                likeState={getLikeState(post.id)}
-                followState={getFollowState(post.author.name)}
-                onToggleLike={(currentPost) => void handleQuickToggleLike(currentPost)}
-                onToggleFollow={(currentPost) => void handleQuickToggleFollow(currentPost)}
-                onOpenComments={handleOpenComments}
-              />
-            )
-          })}
-        </section>
-      ) : null}
+      <FeedPostGrid
+        posts={posts}
+        isGridSurface={isGridSurface}
+        activeStatus={activeState.status}
+        revealedSensitivePostIds={revealedSensitivePostIds}
+        hasSessionKey={hasSessionKey}
+        getLikeState={getLikeState}
+        getFollowState={getFollowState}
+        resolveLikedState={resolveLikedState}
+        resolveFollowingState={resolveFollowingState}
+        resolvePostSensitiveState={resolvePostSensitiveState}
+        resolvePostReportScore={resolvePostReportScore}
+        onRevealSensitive={revealSensitivePost}
+        onToggleLike={(post) => void handleQuickToggleLike(post)}
+        onToggleFollow={(post) => void handleQuickToggleFollow(post)}
+        onOpenComments={handleOpenComments}
+      />
 
       {surface !== 'search' &&
       activeState.status === 'ready' &&
