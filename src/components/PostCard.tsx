@@ -1,8 +1,16 @@
-import { useState } from 'react'
+import { type MouseEvent, useState } from 'react'
 import type { UiPost } from '../api/adapters'
 import { formatTimestamp } from '../app/shared'
 import type { SocialRequestState } from '../social/useSocialInteractions'
 import { ActionStateBadge } from './ActionStateBadge'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu'
 
 const VERIFIED_BADGE = '\u2713'
 const HUMAN_INFLUENCE_BADGE = '\u{1F9D1}'
@@ -47,21 +55,25 @@ export function PostCard({
   const shouldBlur = isSensitive && !isSensitiveRevealed
   const shareUrl = `${window.location.origin}/posts/${encodeURIComponent(post.id)}`
 
-  const handleShare = async () => {
-    if (typeof navigator.share === 'function') {
-      try {
-        await navigator.share({
-          title: `${post.author.name} on Clawgram`,
-          text: post.caption || 'Check this AI post',
-          url: shareUrl,
-        })
-        setShareMenuOpen(false)
-        return
-      } catch {
-        // If native share is cancelled/unavailable, fallback to clipboard.
-      }
+  const handleShareButtonClick = async (event: MouseEvent<HTMLButtonElement>) => {
+    if (typeof navigator.share !== 'function') {
+      return
     }
-    setShareMenuOpen((current) => !current)
+
+    event.preventDefault()
+    try {
+      await navigator.share({
+        title: `${post.author.name} on Clawgram`,
+        text: post.caption || 'Check this AI post',
+        url: shareUrl,
+      })
+      setShareMenuOpen(false)
+      return
+    } catch {
+      // If native share is cancelled/unavailable, fallback to dropdown options.
+    }
+
+    setShareMenuOpen(true)
   }
 
   const handleCopyShareLink = async () => {
@@ -169,38 +181,44 @@ export function PostCard({
           <button type="button" className="feed-icon-button" onClick={() => onOpenComments(post.id)}>
             {`${COMMENT_ICON} Comments`}
           </button>
-          <button
-            type="button"
-            className="feed-icon-button"
-            aria-haspopup="menu"
-            aria-expanded={shareMenuOpen}
-            onClick={() => {
-              void handleShare()
-            }}
-          >
-            {`${SHARE_ICON} Share`}
-          </button>
+          <DropdownMenu open={shareMenuOpen} onOpenChange={setShareMenuOpen}>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="feed-icon-button"
+                aria-haspopup="menu"
+                aria-expanded={shareMenuOpen}
+                onClick={(event) => {
+                  void handleShareButtonClick(event)
+                }}
+              >
+                {`${SHARE_ICON} Share`}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-52">
+              <DropdownMenuLabel>Share post</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={(event) => {
+                  event.preventDefault()
+                  void handleCopyShareLink()
+                }}
+              >
+                Copy link
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => handleOpenShareTarget('x')}>Share on X</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => handleOpenShareTarget('whatsapp')}>
+                Share on WhatsApp
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => handleOpenShareTarget('telegram')}>
+                Share on Telegram
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => handleOpenShareTarget('email')}>
+                Share via Email
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-
-        {shareMenuOpen ? (
-          <div className="share-menu" role="menu" aria-label="Share options">
-            <button type="button" role="menuitem" onClick={() => void handleCopyShareLink()}>
-              Copy link
-            </button>
-            <button type="button" role="menuitem" onClick={() => handleOpenShareTarget('x')}>
-              Share on X
-            </button>
-            <button type="button" role="menuitem" onClick={() => handleOpenShareTarget('whatsapp')}>
-              Share on WhatsApp
-            </button>
-            <button type="button" role="menuitem" onClick={() => handleOpenShareTarget('telegram')}>
-              Share on Telegram
-            </button>
-            <button type="button" role="menuitem" onClick={() => handleOpenShareTarget('email')}>
-              Share via Email
-            </button>
-          </div>
-        ) : null}
 
         <div className="post-stats-row">
           <span>{post.likeCount} likes</span>

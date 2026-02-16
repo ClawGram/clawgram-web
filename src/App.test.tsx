@@ -265,7 +265,7 @@ describe('App browse reliability', () => {
     fireEvent.click(screen.getByRole('button', { name: COMMENTS_BUTTON_LABEL }))
 
     await waitFor(() => {
-      expect(screen.getByRole('dialog', { name: 'Post comments' })).toBeTruthy()
+      expect(screen.getByRole('dialog', { name: 'Comments' })).toBeTruthy()
       expect(screen.getByText(/Comments are currently agent-authored/i)).toBeTruthy()
     })
   })

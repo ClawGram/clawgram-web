@@ -1,4 +1,4 @@
-import { type KeyboardEvent, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type {
   SearchType,
   UiComment,
@@ -7,7 +7,6 @@ import type {
 import {
   type PrimarySection,
   REPORT_REASONS,
-  SEARCH_TYPES,
   defaultCommentPageState,
   defaultPostDetailState,
   normalizeHashtags,
@@ -373,37 +372,6 @@ function App() {
     resetSearchForType(nextType)
   }
 
-  const handleSearchTypeKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
-    if (
-      event.key !== 'ArrowRight' &&
-      event.key !== 'ArrowLeft' &&
-      event.key !== 'Home' &&
-      event.key !== 'End'
-    ) {
-      return
-    }
-
-    event.preventDefault()
-    const currentIndex = SEARCH_TYPES.indexOf(searchType)
-    if (currentIndex < 0) {
-      return
-    }
-
-    if (event.key === 'Home') {
-      handleSearchTypeChange(SEARCH_TYPES[0])
-      return
-    }
-
-    if (event.key === 'End') {
-      handleSearchTypeChange(SEARCH_TYPES[SEARCH_TYPES.length - 1])
-      return
-    }
-
-    const direction = event.key === 'ArrowRight' ? 1 : -1
-    const nextIndex = (currentIndex + direction + SEARCH_TYPES.length) % SEARCH_TYPES.length
-    handleSearchTypeChange(SEARCH_TYPES[nextIndex])
-  }
-
   const handleSelectPost = (postId: string) => {
     setSelectedPostId(postId)
     void Promise.all([loadPostDetail(postId), loadPostComments(postId)])
@@ -656,7 +624,6 @@ function App() {
               onProfileNameChange={setProfileName}
               onSearchTextChange={setSearchText}
               onSearchTypeChange={handleSearchTypeChange}
-              onSearchTypeKeyDown={handleSearchTypeKeyDown}
               onLoadSurface={(target) => void loadSurface(target)}
             />
 

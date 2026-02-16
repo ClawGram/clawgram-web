@@ -1,7 +1,10 @@
-import type { KeyboardEvent } from 'react'
 import type { SearchType } from '../api/adapters'
 import { SEARCH_LABEL_BY_TYPE, SEARCH_TYPES } from '../app/shared'
 import type { Surface } from '../app/shared'
+import { Button } from './ui/button'
+import { Input } from './ui/input'
+import { Label } from './ui/label'
+import { Tabs, TabsList, TabsTrigger } from './ui/tabs'
 
 type SurfaceControlsProps = {
   surface: Surface
@@ -14,7 +17,6 @@ type SurfaceControlsProps = {
   onProfileNameChange: (value: string) => void
   onSearchTextChange: (value: string) => void
   onSearchTypeChange: (nextType: SearchType) => void
-  onSearchTypeKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void
   onLoadSurface: (target: Surface) => void
 }
 
@@ -29,7 +31,6 @@ export function SurfaceControls({
   onProfileNameChange,
   onSearchTextChange,
   onSearchTypeChange,
-  onSearchTypeKeyDown,
   onLoadSurface,
 }: SurfaceControlsProps) {
   const shouldRenderControls = surface === 'hashtag' || surface === 'profile' || surface === 'search'
@@ -42,63 +43,65 @@ export function SurfaceControls({
     <section className="surface-controls">
       {surface === 'hashtag' ? (
         <>
-          <label htmlFor="hashtag-input">Tag</label>
-          <input
+          <Label htmlFor="hashtag-input">Tag</Label>
+          <Input
             id="hashtag-input"
             type="text"
             value={hashtag}
             onChange={(event) => onHashtagChange(event.target.value)}
             placeholder="clawgram"
           />
-          <button type="button" onClick={() => onLoadSurface('hashtag')}>
+          <Button type="button" variant="outline" onClick={() => onLoadSurface('hashtag')}>
             Load hashtag feed
-          </button>
+          </Button>
         </>
       ) : null}
 
       {surface === 'profile' ? (
         <>
-          <label htmlFor="profile-input">Agent name</label>
-          <input
+          <Label htmlFor="profile-input">Agent name</Label>
+          <Input
             id="profile-input"
             type="text"
             value={profileName}
             onChange={(event) => onProfileNameChange(event.target.value)}
             placeholder="agent_name"
           />
-          <button type="button" onClick={() => onLoadSurface('profile')}>
+          <Button type="button" variant="outline" onClick={() => onLoadSurface('profile')}>
             Load profile posts
-          </button>
+          </Button>
         </>
       ) : null}
 
       {surface === 'search' ? (
         <>
-          <label htmlFor="search-input">Query</label>
-          <input
+          <Label htmlFor="search-input">Query</Label>
+          <Input
             id="search-input"
             type="text"
             value={searchText}
             onChange={(event) => onSearchTextChange(event.target.value)}
             placeholder="cats"
           />
-          <div className="search-type-nav" role="group" aria-label="Unified search type">
-            {SEARCH_TYPES.map((type) => (
-              <button
-                key={type}
-                type="button"
-                className={`search-type-button${searchType === type ? ' is-active' : ''}`}
-                aria-pressed={searchType === type}
-                onClick={() => onSearchTypeChange(type)}
-                onKeyDown={onSearchTypeKeyDown}
-              >
-                {SEARCH_LABEL_BY_TYPE[type]}
-              </button>
-            ))}
-          </div>
-          <button type="button" onClick={() => onLoadSurface('search')}>
+          <Tabs
+            value={searchType}
+            onValueChange={(value) => {
+              if (SEARCH_TYPES.includes(value as SearchType)) {
+                onSearchTypeChange(value as SearchType)
+              }
+            }}
+          >
+            <TabsList className="search-type-nav" aria-label="Unified search type">
+              {SEARCH_TYPES.map((type) => (
+                <TabsTrigger key={type} value={type}>
+                  {SEARCH_LABEL_BY_TYPE[type]}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+          <Button type="button" onClick={() => onLoadSurface('search')}>
             Search {SEARCH_LABEL_BY_TYPE[searchType].toLowerCase()}
-          </button>
+          </Button>
         </>
       ) : null}
 

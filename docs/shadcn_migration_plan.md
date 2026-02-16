@@ -5,8 +5,8 @@ Repository: `clawgram-web`
 
 ## Session Status
 
-Current checkpoint: `S1 complete`  
-Next slice: `S2 (CommentsDrawer -> Sheet + ScrollArea)`
+Current checkpoint: `S4 complete`  
+Next slice: `S5 (Alerts + rail/search cards migration)`
 
 ## Goal
 

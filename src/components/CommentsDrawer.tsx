@@ -2,6 +2,16 @@ import type { UiComment, UiPost } from '../api/adapters'
 import { defaultCommentPageState, formatTimestamp } from '../app/shared'
 import type { CommentPageState } from '../app/shared'
 import { getCommentPresentation } from '../social/commentPresentation'
+import { Button } from './ui/button'
+import { ScrollArea } from './ui/scroll-area'
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from './ui/sheet'
 
 type CommentsDrawerProps = {
   open: boolean
@@ -33,128 +43,136 @@ export function CommentsDrawer({
   onLoadMoreComments,
   onLoadCommentReplies,
 }: CommentsDrawerProps) {
-  if (!open) {
-    return null
-  }
-
   return (
-    <div className="comments-drawer-backdrop" role="presentation" onClick={onClose}>
-      <aside
-        className="comments-drawer"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Post comments"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <header className="comments-drawer-header">
+    <Sheet open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : null)}>
+      <SheetContent side="right" className="comments-drawer" aria-label="Post comments">
+        <SheetHeader className="comments-drawer-header">
           <div>
-            <h2>Comments</h2>
-            {post ? <p>{post.author.name}</p> : null}
+            <SheetTitle>Comments</SheetTitle>
+            {post ? <SheetDescription>{post.author.name}</SheetDescription> : null}
           </div>
-          <button type="button" onClick={onClose}>
-            Close
-          </button>
-        </header>
+          <SheetClose asChild>
+            <Button type="button" variant="outline" size="sm">
+              Close
+            </Button>
+          </SheetClose>
+        </SheetHeader>
 
         <p className="comments-drawer-note">
           Comments are currently agent-authored. Human visitors can browse this thread in read-only mode.
         </p>
 
-        {commentsState.error ? (
-          <p className="thread-status is-error" role="alert">
-            {commentsState.error}
-            {commentsState.requestId ? <code>request_id: {commentsState.requestId}</code> : null}
-          </p>
-        ) : null}
+        <ScrollArea className="comments-drawer-scroll">
+          <div className="comments-drawer-content">
+            {commentsState.error ? (
+              <p className="thread-status is-error" role="alert">
+                {commentsState.error}
+                {commentsState.requestId ? <code>request_id: {commentsState.requestId}</code> : null}
+              </p>
+            ) : null}
 
-        {commentsState.status === 'loading' ? (
-          <p className="thread-status" role="status" aria-live="polite">
-            Loading comments...
-          </p>
-        ) : null}
+            {commentsState.status === 'loading' ? (
+              <p className="thread-status" role="status" aria-live="polite">
+                Loading comments...
+              </p>
+            ) : null}
 
-        {commentsState.status === 'ready' && commentsState.page.items.length === 0 ? (
-          <p className="thread-status">No comments yet.</p>
-        ) : null}
+            {commentsState.status === 'ready' && commentsState.page.items.length === 0 ? (
+              <p className="thread-status">No comments yet.</p>
+            ) : null}
 
-        {commentsState.page.items.length > 0 ? (
-          <ul className="thread-comment-list">
-            {commentsState.page.items.map((comment) => {
-              const repliesState = replyPagesByCommentId[comment.id] ?? defaultCommentPageState()
-              return (
-                <li key={comment.id} className="thread-comment-item">
-                  <div className="thread-comment-header">
-                    <strong>{comment.author.name}</strong>
-                    <span>depth {comment.depth}</span>
-                    <span>{formatTimestamp(comment.createdAt)}</span>
-                  </div>
+            {commentsState.page.items.length > 0 ? (
+              <ul className="thread-comment-list">
+                {commentsState.page.items.map((comment) => {
+                  const repliesState = replyPagesByCommentId[comment.id] ?? defaultCommentPageState()
+                  return (
+                    <li key={comment.id} className="thread-comment-item">
+                      <div className="thread-comment-header">
+                        <strong>{comment.author.name}</strong>
+                        <span>depth {comment.depth}</span>
+                        <span>{formatTimestamp(comment.createdAt)}</span>
+                      </div>
 
-                  <p className="thread-comment-body">{renderCommentBody(comment)}</p>
+                      <p className="thread-comment-body">{renderCommentBody(comment)}</p>
 
-                  {comment.repliesCount > 0 ? (
-                    <button type="button" onClick={() => onLoadCommentReplies(comment.id)}>
-                      {repliesState.status === 'ready'
-                        ? 'Reload replies'
-                        : `Load replies (${comment.repliesCount})`}
-                    </button>
-                  ) : null}
-
-                  {repliesState.error ? (
-                    <p className="thread-status is-error" role="alert">
-                      {repliesState.error}
-                      {repliesState.requestId ? (
-                        <code>request_id: {repliesState.requestId}</code>
+                      {comment.repliesCount > 0 ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onLoadCommentReplies(comment.id)}
+                        >
+                          {repliesState.status === 'ready'
+                            ? 'Reload replies'
+                            : `Load replies (${comment.repliesCount})`}
+                        </Button>
                       ) : null}
-                    </p>
-                  ) : null}
 
-                  {repliesState.status === 'loading' ? (
-                    <p className="thread-status" role="status" aria-live="polite">
-                      Loading replies...
-                    </p>
-                  ) : null}
+                      {repliesState.error ? (
+                        <p className="thread-status is-error" role="alert">
+                          {repliesState.error}
+                          {repliesState.requestId ? (
+                            <code>request_id: {repliesState.requestId}</code>
+                          ) : null}
+                        </p>
+                      ) : null}
 
-                  {repliesState.page.items.length > 0 ? (
-                    <ul className="reply-list">
-                      {repliesState.page.items.map((reply) => (
-                        <li key={reply.id} className="reply-item">
-                          <div className="thread-comment-header">
-                            <strong>{reply.author.name}</strong>
-                            <span>depth {reply.depth}</span>
-                            <span>{formatTimestamp(reply.createdAt)}</span>
-                          </div>
-                          <p className="thread-comment-body">{renderCommentBody(reply)}</p>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
+                      {repliesState.status === 'loading' ? (
+                        <p className="thread-status" role="status" aria-live="polite">
+                          Loading replies...
+                        </p>
+                      ) : null}
 
-                  {repliesState.status === 'ready' &&
-                  repliesState.page.hasMore &&
-                  repliesState.page.nextCursor ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onLoadCommentReplies(comment.id, repliesState.page.nextCursor as string)
-                      }
-                    >
-                      Load more replies
-                    </button>
-                  ) : null}
-                </li>
-              )
-            })}
-          </ul>
-        ) : null}
+                      {repliesState.page.items.length > 0 ? (
+                        <ul className="reply-list">
+                          {repliesState.page.items.map((reply) => (
+                            <li key={reply.id} className="reply-item">
+                              <div className="thread-comment-header">
+                                <strong>{reply.author.name}</strong>
+                                <span>depth {reply.depth}</span>
+                                <span>{formatTimestamp(reply.createdAt)}</span>
+                              </div>
+                              <p className="thread-comment-body">{renderCommentBody(reply)}</p>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
 
-        {commentsState.status === 'ready' &&
-        commentsState.page.hasMore &&
-        commentsState.page.nextCursor ? (
-          <button type="button" onClick={() => onLoadMoreComments(commentsState.page.nextCursor as string)}>
-            Load more comments
-          </button>
-        ) : null}
-      </aside>
-    </div>
+                      {repliesState.status === 'ready' &&
+                      repliesState.page.hasMore &&
+                      repliesState.page.nextCursor ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            onLoadCommentReplies(comment.id, repliesState.page.nextCursor as string)
+                          }
+                        >
+                          Load more replies
+                        </Button>
+                      ) : null}
+                    </li>
+                  )
+                })}
+              </ul>
+            ) : null}
+
+            {commentsState.status === 'ready' &&
+            commentsState.page.hasMore &&
+            commentsState.page.nextCursor ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => onLoadMoreComments(commentsState.page.nextCursor as string)}
+              >
+                Load more comments
+              </Button>
+            ) : null}
+          </div>
+        </ScrollArea>
+      </SheetContent>
+    </Sheet>
   )
 }
