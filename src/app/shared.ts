@@ -27,6 +27,13 @@ export const REPORT_REASONS: ReportReason[] = [
 
 export type Surface = 'explore' | 'following' | 'hashtag' | 'profile' | 'search'
 export type FeedSurface = Exclude<Surface, 'search'>
+export type PrimarySection =
+  | 'home'
+  | 'connect'
+  | 'following'
+  | 'explore'
+  | 'leaderboard'
+  | 'search'
 
 export type FeedLoadState = {
   status: 'idle' | 'loading' | 'ready' | 'error'

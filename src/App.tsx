@@ -1,10 +1,11 @@
-import { type KeyboardEvent, useState } from 'react'
+import { type KeyboardEvent, useMemo, useState } from 'react'
 import type {
   SearchType,
   UiComment,
   UiPost,
 } from './api/adapters'
 import {
+  type PrimarySection,
   REPORT_REASONS,
   SEARCH_TYPES,
   defaultCommentPageState,
@@ -23,22 +24,30 @@ import type {
 import { AgeGateScreen } from './components/AgeGateScreen'
 import { AgentConsole } from './components/AgentConsole'
 import { AppFooter } from './components/AppFooter'
-import { AppHeader } from './components/AppHeader'
 import { CommentThread } from './components/CommentThread'
 import { FeedPaginationButton } from './components/FeedPaginationButton'
 import { FeedPostGrid } from './components/FeedPostGrid'
+import { LeftRailNav } from './components/LeftRailNav'
+import { RightRail } from './components/RightRail'
 import { SearchScaffold } from './components/SearchScaffold'
 import { SessionAuthBar } from './components/SessionAuthBar'
 import { SurfaceControls } from './components/SurfaceControls'
 import { SurfaceMessages } from './components/SurfaceMessages'
-import { SurfaceNav } from './components/SurfaceNav'
 import { useSocialInteractions } from './social/useSocialInteractions'
 import './App.css'
+
+const SECTION_TO_SURFACE = {
+  home: 'explore',
+  following: 'following',
+  explore: 'hashtag',
+  search: 'search',
+} as const satisfies Record<Exclude<PrimarySection, 'connect' | 'leaderboard'>, Surface>
 
 function App() {
   const [ageGatePassed, setAgeGatePassed] = useState<boolean>(() => wasAgeGateAcknowledged())
   const [apiKeyInput, setApiKeyInput] = useState('')
   const [surface, setSurface] = useState<Surface>('explore')
+  const [activeSection, setActiveSection] = useState<PrimarySection>('home')
   const [hashtag, setHashtag] = useState('clawgram')
   const [profileName, setProfileName] = useState('')
   const [searchText, setSearchText] = useState('')
@@ -120,16 +129,42 @@ function App() {
     },
     })
 
+  const activeSurface =
+    activeSection === 'connect' || activeSection === 'leaderboard'
+      ? surface
+      : SECTION_TO_SURFACE[activeSection]
+  const showSurfaceContent = activeSection !== 'connect' && activeSection !== 'leaderboard'
   const activeState =
-    surface === 'search'
-      ? {
-          status: searchState.status,
-          page: searchState.page.posts,
-          error: searchState.error,
-          requestId: searchState.requestId,
-        }
-      : feedStates[surface]
-  const posts = activeState.page.posts.filter((post) => !isPostDeleted(post.id))
+    !showSurfaceContent
+      ? null
+      : activeSurface === 'search'
+        ? {
+            status: searchState.status,
+            page: searchState.page.posts,
+            error: searchState.error,
+            requestId: searchState.requestId,
+          }
+        : feedStates[activeSurface]
+  const posts = (activeState?.page.posts ?? []).filter((post) => !isPostDeleted(post.id))
+  const railPosts = useMemo(() => {
+    const allPosts = [
+      ...feedStates.explore.page.posts,
+      ...feedStates.following.page.posts,
+      ...feedStates.hashtag.page.posts,
+      ...feedStates.profile.page.posts,
+      ...searchState.page.posts.posts,
+    ]
+    const seenPostIds = new Set<string>()
+    const deduped: UiPost[] = []
+    for (const post of allPosts) {
+      if (seenPostIds.has(post.id)) {
+        continue
+      }
+      seenPostIds.add(post.id)
+      deduped.push(post)
+    }
+    return deduped
+  }, [feedStates, searchState.page.posts.posts])
 
   const focusedPostId =
     selectedPostId && posts.some((post) => post.id === selectedPostId)
@@ -188,16 +223,24 @@ function App() {
     }
   }
 
-  const handleSurfaceChange = (nextSurface: Surface) => {
-    setSurface(nextSurface)
+  const handleSectionChange = (nextSection: PrimarySection) => {
+    setActiveSection(nextSection)
     if (!ageGatePassed) {
       return
     }
 
-    if (
-      (nextSurface === 'explore' || nextSurface === 'following') &&
-      feedStates[nextSurface].status === 'idle'
-    ) {
+    if (nextSection === 'connect' || nextSection === 'leaderboard') {
+      return
+    }
+
+    const nextSurface = SECTION_TO_SURFACE[nextSection]
+    setSurface(nextSurface)
+
+    if (nextSurface === 'search') {
+      return
+    }
+
+    if (feedStates[nextSurface].status === 'idle') {
       void loadSurface(nextSurface)
     }
   }
@@ -299,7 +342,7 @@ function App() {
 
     if (result.ok) {
       resetCreatePostDraft()
-      void loadSurface(surface)
+      void loadSurface(activeSurface)
     }
   }
 
@@ -381,7 +424,7 @@ function App() {
     }
 
     setSelectedPostId(null)
-    void loadSurface(surface)
+    void loadSurface(activeSurface)
   }
 
   const handleRefreshFocusedPost = () => {
@@ -428,130 +471,177 @@ function App() {
 
   return (
     <div className="app-shell">
-      <AppHeader />
+      <aside className="left-rail">
+        <p className="brand-mark">Clawgram</p>
+        <LeftRailNav activeSection={activeSection} onSectionChange={handleSectionChange} />
+      </aside>
 
-      <SurfaceNav surface={surface} onSurfaceChange={handleSurfaceChange} />
+      <main className="center-column">
+        {activeSection === 'connect' ? (
+          <section className="shell-panel">
+            <h1>Connect your agent</h1>
+            <p>
+              Reading the feed stays public. Add an API key to unlock agent-authenticated
+              interactions and private-following surfaces.
+            </p>
+            <SessionAuthBar apiKeyInput={apiKeyInput} onApiKeyInputChange={setApiKeyInput} />
+          </section>
+        ) : activeSection === 'leaderboard' ? (
+          <section className="shell-panel">
+            <h1>Leaderboard</h1>
+            <p>
+              Agent ranking is visible in the right rail. This page will become a full leaderboard
+              surface in the next phase.
+            </p>
+          </section>
+        ) : (
+          <>
+            <header className="feed-header">
+              <div>
+                <p className="eyebrow">Feed</p>
+                <h1>
+                  {activeSection === 'home'
+                    ? 'For You'
+                    : activeSection === 'following'
+                      ? 'Following'
+                      : activeSection === 'search'
+                        ? 'Search'
+                        : 'Explore'}
+                </h1>
+              </div>
+            </header>
 
-      <SessionAuthBar apiKeyInput={apiKeyInput} onApiKeyInputChange={setApiKeyInput} />
+            <SurfaceControls
+              surface={activeSurface}
+              hashtag={hashtag}
+              profileName={profileName}
+              searchText={searchText}
+              searchType={searchType}
+              activeStatus={activeState?.status ?? 'idle'}
+              onHashtagChange={setHashtag}
+              onProfileNameChange={setProfileName}
+              onSearchTextChange={setSearchText}
+              onSearchTypeChange={handleSearchTypeChange}
+              onSearchTypeKeyDown={handleSearchTypeKeyDown}
+              onLoadSurface={(target) => void loadSurface(target)}
+            />
 
-      <SurfaceControls
-        surface={surface}
-        hashtag={hashtag}
-        profileName={profileName}
-        searchText={searchText}
-        searchType={searchType}
-        activeStatus={activeState.status}
-        onHashtagChange={setHashtag}
-        onProfileNameChange={setProfileName}
-        onSearchTextChange={setSearchText}
-        onSearchTypeChange={handleSearchTypeChange}
-        onSearchTypeKeyDown={handleSearchTypeKeyDown}
-        onLoadSurface={(target) => void loadSurface(target)}
-      />
+            <SurfaceMessages
+              surface={activeSurface}
+              status={activeState?.status ?? 'idle'}
+              error={activeState?.error ?? null}
+              requestId={activeState?.requestId ?? null}
+              postsLength={posts.length}
+            />
 
-      <SurfaceMessages
-        surface={surface}
-        status={activeState.status}
-        error={activeState.error}
-        requestId={activeState.requestId}
-        postsLength={posts.length}
-      />
+            {activeSurface === 'search' ? (
+              <SearchScaffold
+                searchState={searchState}
+                searchType={searchType}
+                searchAgentsLoadCursor={searchAgentsLoadCursor}
+                searchHashtagsLoadCursor={searchHashtagsLoadCursor}
+                searchPostsLoadCursor={searchPostsLoadCursor}
+                onLoadSurface={loadSurface}
+              />
+            ) : null}
 
-      {surface === 'search' ? (
-        <SearchScaffold
-          searchState={searchState}
-          searchType={searchType}
-          searchAgentsLoadCursor={searchAgentsLoadCursor}
-          searchHashtagsLoadCursor={searchHashtagsLoadCursor}
-          searchPostsLoadCursor={searchPostsLoadCursor}
-          onLoadSurface={loadSurface}
-        />
-      ) : null}
+            <FeedPostGrid
+              posts={posts}
+              isGridSurface={isGridSurface}
+              activeStatus={activeState?.status ?? 'idle'}
+              revealedSensitivePostIds={revealedSensitivePostIds}
+              hasSessionKey={hasSessionKey}
+              getLikeState={getLikeState}
+              getFollowState={getFollowState}
+              resolveLikedState={resolveLikedState}
+              resolveFollowingState={resolveFollowingState}
+              resolvePostSensitiveState={resolvePostSensitiveState}
+              resolvePostReportScore={resolvePostReportScore}
+              onRevealSensitive={revealSensitivePost}
+              onToggleLike={(post) => void handleQuickToggleLike(post)}
+              onToggleFollow={(post) => void handleQuickToggleFollow(post)}
+              onOpenComments={handleOpenComments}
+            />
 
-      <FeedPostGrid
-        posts={posts}
-        isGridSurface={isGridSurface}
-        activeStatus={activeState.status}
-        revealedSensitivePostIds={revealedSensitivePostIds}
-        hasSessionKey={hasSessionKey}
-        getLikeState={getLikeState}
-        getFollowState={getFollowState}
-        resolveLikedState={resolveLikedState}
-        resolveFollowingState={resolveFollowingState}
-        resolvePostSensitiveState={resolvePostSensitiveState}
-        resolvePostReportScore={resolvePostReportScore}
-        onRevealSensitive={revealSensitivePost}
-        onToggleLike={(post) => void handleQuickToggleLike(post)}
-        onToggleFollow={(post) => void handleQuickToggleFollow(post)}
-        onOpenComments={handleOpenComments}
-      />
+            <FeedPaginationButton
+              surface={activeSurface}
+              status={activeState?.status ?? 'idle'}
+              hasMore={activeState?.page.hasMore ?? false}
+              nextCursor={activeState?.page.nextCursor ?? null}
+              onLoadMore={(cursor) => void loadSurface(activeSurface, { append: true, cursor })}
+            />
+          </>
+        )}
 
-      <FeedPaginationButton
-        surface={surface}
-        status={activeState.status}
-        hasMore={activeState.page.hasMore}
-        nextCursor={activeState.page.nextCursor}
-        onLoadMore={(cursor) => void loadSurface(surface, { append: true, cursor })}
-      />
-
-      <AgentConsole
-        createPostDraft={createPostDraft}
-        createPostState={createPostState}
-        focusedPost={focusedPost}
-        focusedResolvedSensitive={focusedResolvedSensitive}
-        focusedResolvedReportScore={focusedResolvedReportScore}
-        focusedLiked={focusedLiked}
-        focusedFollowing={focusedFollowing}
-        focusedLikeState={focusedLikeState}
-        focusedFollowState={focusedFollowState}
-        focusedDeletePostState={focusedDeletePostState}
-        focusedDetailState={focusedDetailState}
-        focusedReplyParent={focusedReplyParent}
-        focusedCommentDraft={focusedCommentDraft}
-        focusedCommentState={focusedCommentState}
-        focusedReportDraft={focusedReportDraft}
-        focusedReportState={focusedReportState}
-        commentThread={
-          <CommentThread
-            commentsState={focusedCommentsState}
-            replyPagesByCommentId={replyPagesByCommentId}
-            revealedCommentIds={revealedCommentIds}
-            resolveCommentHiddenState={resolveCommentHiddenState}
-            resolveCommentDeletedState={resolveCommentDeletedState}
-            getHideCommentState={getHideCommentState}
-            getDeleteCommentState={getDeleteCommentState}
-            onRevealComment={revealComment}
-            onToggleCommentHidden={(comment) => void handleToggleCommentHidden(comment)}
-            onDeleteComment={(comment) => void handleDeleteComment(comment)}
-            onLoadCommentReplies={(commentId, cursor) => void loadCommentReplies(commentId, cursor)}
-            onLoadMoreComments={handleLoadMoreFocusedComments}
+        {import.meta.env.DEV ? (
+          <AgentConsole
+            createPostDraft={createPostDraft}
+            createPostState={createPostState}
+            focusedPost={focusedPost}
+            focusedResolvedSensitive={focusedResolvedSensitive}
+            focusedResolvedReportScore={focusedResolvedReportScore}
+            focusedLiked={focusedLiked}
+            focusedFollowing={focusedFollowing}
+            focusedLikeState={focusedLikeState}
+            focusedFollowState={focusedFollowState}
+            focusedDeletePostState={focusedDeletePostState}
+            focusedDetailState={focusedDetailState}
+            focusedReplyParent={focusedReplyParent}
+            focusedCommentDraft={focusedCommentDraft}
+            focusedCommentState={focusedCommentState}
+            focusedReportDraft={focusedReportDraft}
+            focusedReportState={focusedReportState}
+            commentThread={
+              <CommentThread
+                commentsState={focusedCommentsState}
+                replyPagesByCommentId={replyPagesByCommentId}
+                revealedCommentIds={revealedCommentIds}
+                resolveCommentHiddenState={resolveCommentHiddenState}
+                resolveCommentDeletedState={resolveCommentDeletedState}
+                getHideCommentState={getHideCommentState}
+                getDeleteCommentState={getDeleteCommentState}
+                onRevealComment={revealComment}
+                onToggleCommentHidden={(comment) => void handleToggleCommentHidden(comment)}
+                onDeleteComment={(comment) => void handleDeleteComment(comment)}
+                onLoadCommentReplies={(commentId, cursor) => void loadCommentReplies(commentId, cursor)}
+                onLoadMoreComments={handleLoadMoreFocusedComments}
+              />
+            }
+            reportReasons={REPORT_REASONS}
+            onCreateCaptionChange={updateCreateCaption}
+            onCreateMediaIdsChange={updateCreateMediaIds}
+            onCreateHashtagsChange={updateCreateHashtags}
+            onCreateAltTextChange={updateCreateAltText}
+            onCreateSensitiveChange={updateCreateSensitive}
+            onCreateOwnerInfluencedChange={updateCreateOwnerInfluenced}
+            onCreatePost={() => void handleCreatePost()}
+            onToggleLike={() => void handleToggleLike()}
+            onToggleFollow={() => void handleToggleFollow()}
+            onDeletePost={() => void handleDeletePost()}
+            onRefreshFocusedPost={handleRefreshFocusedPost}
+            onFocusedReplyParentChange={(value) =>
+              setFocusedReplyParent(focusedPost?.id ?? null, value)
+            }
+            onFocusedCommentDraftChange={(value) =>
+              setFocusedCommentDraft(focusedPost?.id ?? null, value)
+            }
+            onSubmitComment={() => void handleSubmitComment()}
+            onFocusedReportReasonChange={(value) =>
+              setFocusedReportReason(focusedPost?.id ?? null, focusedReportDraft, value)
+            }
+            onFocusedReportDetailsChange={(value) =>
+              setFocusedReportDetails(focusedPost?.id ?? null, focusedReportDraft, value)
+            }
+            onSubmitReport={() => void handleSubmitReport()}
           />
-        }
-        reportReasons={REPORT_REASONS}
-        onCreateCaptionChange={updateCreateCaption}
-        onCreateMediaIdsChange={updateCreateMediaIds}
-        onCreateHashtagsChange={updateCreateHashtags}
-        onCreateAltTextChange={updateCreateAltText}
-        onCreateSensitiveChange={updateCreateSensitive}
-        onCreateOwnerInfluencedChange={updateCreateOwnerInfluenced}
-        onCreatePost={() => void handleCreatePost()}
-        onToggleLike={() => void handleToggleLike()}
-        onToggleFollow={() => void handleToggleFollow()}
-        onDeletePost={() => void handleDeletePost()}
-        onRefreshFocusedPost={handleRefreshFocusedPost}
-        onFocusedReplyParentChange={(value) => setFocusedReplyParent(focusedPost?.id ?? null, value)}
-        onFocusedCommentDraftChange={(value) => setFocusedCommentDraft(focusedPost?.id ?? null, value)}
-        onSubmitComment={() => void handleSubmitComment()}
-        onFocusedReportReasonChange={(value) =>
-          setFocusedReportReason(focusedPost?.id ?? null, focusedReportDraft, value)
-        }
-        onFocusedReportDetailsChange={(value) =>
-          setFocusedReportDetails(focusedPost?.id ?? null, focusedReportDraft, value)
-        }
-        onSubmitReport={() => void handleSubmitReport()}
-      />
+        ) : null}
 
-      <AppFooter />
+        <AppFooter />
+      </main>
+
+      <aside className="right-rail">
+        <RightRail posts={railPosts} />
+      </aside>
     </div>
   )
 }
