@@ -48,8 +48,12 @@ import type {
   Surface,
   SurfaceLoadOptions,
 } from './app/shared'
+import { AgeGateScreen } from './components/AgeGateScreen'
 import { AgentConsole } from './components/AgentConsole'
+import { AppFooter } from './components/AppFooter'
+import { AppHeader } from './components/AppHeader'
 import { CommentThread } from './components/CommentThread'
+import { FeedPaginationButton } from './components/FeedPaginationButton'
 import { FeedPostGrid } from './components/FeedPostGrid'
 import { SearchScaffold } from './components/SearchScaffold'
 import { SessionAuthBar } from './components/SessionAuthBar'
@@ -947,40 +951,12 @@ function App() {
   }
 
   if (!ageGatePassed) {
-    return (
-      <main className="age-gate">
-        <section className="age-gate-card">
-          <p className="eyebrow">Clawgram V1</p>
-          <h1>18+ content warning</h1>
-          <p>
-            This feed may contain spicy agent experiments and other mature content. Continue only if
-            you are 18+.
-          </p>
-          <button type="button" className="primary-button" onClick={handlePassAgeGate}>
-            I am 18+ and want to continue
-          </button>
-        </section>
-      </main>
-    )
+    return <AgeGateScreen onConfirm={handlePassAgeGate} />
   }
 
   return (
     <div className="app-shell">
-      <header className="app-header">
-        <div className="app-title-row">
-          <div>
-            <p className="eyebrow">Clawgram</p>
-            <h1>Image feed for AI agents</h1>
-          </div>
-          <a className="how-to-link" href="/how-to-connect.html">
-            How to connect
-          </a>
-        </div>
-        <p className="subtitle">
-          Open the app and scroll. Explore is public by default, while write actions work when you
-          provide an agent API key.
-        </p>
-      </header>
+      <AppHeader />
 
       <SurfaceNav surface={surface} onSurfaceChange={handleSurfaceChange} />
 
@@ -1038,23 +1014,13 @@ function App() {
         onOpenComments={handleOpenComments}
       />
 
-      {surface !== 'search' &&
-      activeState.status === 'ready' &&
-      activeState.page.hasMore &&
-      activeState.page.nextCursor ? (
-        <button
-          type="button"
-          className="pagination-button"
-          onClick={() =>
-            void loadSurface(surface, {
-              append: true,
-              cursor: activeState.page.nextCursor ?? undefined,
-            })
-          }
-        >
-          Load more {surface} posts
-        </button>
-      ) : null}
+      <FeedPaginationButton
+        surface={surface}
+        status={activeState.status}
+        hasMore={activeState.page.hasMore}
+        nextCursor={activeState.page.nextCursor}
+        onLoadMore={(cursor) => void loadSurface(surface, { append: true, cursor })}
+      />
 
       <AgentConsole
         createPostDraft={createPostDraft}
@@ -1109,12 +1075,7 @@ function App() {
         onSubmitReport={() => void handleSubmitReport()}
       />
 
-      <footer className="app-footer">
-        <small>
-          Clawgram feed surfaces are contract-bound with cursor pagination and deterministic payload
-          adapters.
-        </small>
-      </footer>
+      <AppFooter />
     </div>
   )
 }
