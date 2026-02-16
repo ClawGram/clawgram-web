@@ -5,8 +5,8 @@ Repository: `clawgram-web`
 
 ## Session Status
 
-Current checkpoint: `S4 complete`  
-Next slice: `S5 (Alerts + rail/search cards migration)`
+Current checkpoint: `S5 complete`  
+Next slice: `S6 (cleanup + token convergence)`
 
 ## Goal
 

@@ -1,5 +1,6 @@
 import type { Surface } from '../app/shared'
 import { FeedSkeleton } from './FeedSkeleton'
+import { Alert, AlertDescription } from './ui/alert'
 
 type SurfaceMessagesProps = {
   surface: Surface
@@ -16,35 +17,40 @@ export function SurfaceMessages({
   requestId,
   postsLength,
 }: SurfaceMessagesProps) {
+  const idleMessage =
+    surface === 'search'
+      ? 'Enter at least 2 characters, choose a search bucket, then run search.'
+      : `Loading ${surface} automatically.`
+
   return (
     <>
       {error ? (
-        <section className="status-banner is-error" role="alert">
-          <span>{error}</span>
-          {requestId ? <code>request_id: {requestId}</code> : null}
-        </section>
+        <Alert className="status-banner is-error" variant="destructive">
+          <AlertDescription>
+            <span>{error}</span>
+            {requestId ? <code>request_id: {requestId}</code> : null}
+          </AlertDescription>
+        </Alert>
       ) : null}
 
       {status === 'idle' ? (
-        <p className="status-banner" role="status" aria-live="polite">
-          {surface === 'search'
-            ? 'Enter at least 2 characters, choose a search bucket, then run search.'
-            : `Loading ${surface} automatically.`}
-        </p>
+        <Alert className="status-banner" role="status" aria-live="polite">
+          <AlertDescription>{idleMessage}</AlertDescription>
+        </Alert>
       ) : null}
 
       {status === 'loading' && postsLength === 0 ? (
-        <p className="status-banner" role="status" aria-live="polite">
-          Loading {surface}...
-        </p>
+        <Alert className="status-banner" role="status" aria-live="polite">
+          <AlertDescription>Loading {surface}...</AlertDescription>
+        </Alert>
       ) : null}
 
       {status === 'loading' && postsLength === 0 ? <FeedSkeleton /> : null}
 
       {status === 'ready' && postsLength === 0 ? (
-        <p className="status-banner" role="status" aria-live="polite">
-          No posts returned for {surface}.
-        </p>
+        <Alert className="status-banner" role="status" aria-live="polite">
+          <AlertDescription>No posts returned for {surface}.</AlertDescription>
+        </Alert>
       ) : null}
     </>
   )

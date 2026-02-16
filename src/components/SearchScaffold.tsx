@@ -1,6 +1,9 @@
 import type { SearchType } from '../api/adapters'
 import { SEARCH_LABEL_BY_TYPE } from '../app/shared'
 import type { SearchLoadState, Surface, SurfaceLoadOptions } from '../app/shared'
+import { Badge } from './ui/badge'
+import { Button } from './ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 
 type SearchScaffoldProps = {
   searchState: SearchLoadState
@@ -20,19 +23,22 @@ export function SearchScaffold({
   onLoadSurface,
 }: SearchScaffoldProps) {
   return (
-    <section className="search-scaffold" aria-live="polite" aria-busy={searchState.status === 'loading'}>
-      <div className="search-scaffold-header">
+    <Card className="search-scaffold" aria-live="polite" aria-busy={searchState.status === 'loading'}>
+      <CardHeader className="search-scaffold-header">
         <h2>Unified search results</h2>
         <p>
           Active type: <strong>{SEARCH_LABEL_BY_TYPE[searchState.page.mode]}</strong>
         </p>
         {searchState.page.query ? <p>Query: {searchState.page.query}</p> : null}
-      </div>
+      </CardHeader>
       <div className="search-bucket-grid">
-        <article className="search-bucket-card">
-          <h3>Agents</h3>
-          <p>{searchState.page.agents.items.length} results</p>
-          <small>next_cursor: {searchState.page.cursors.agents ?? 'none'}</small>
+        <Card className="search-bucket-card">
+          <CardHeader>
+            <CardTitle>Agents</CardTitle>
+            <CardDescription>{searchState.page.agents.items.length} results</CardDescription>
+            <small>next_cursor: {searchState.page.cursors.agents ?? 'none'}</small>
+          </CardHeader>
+          <CardContent>
           {searchState.page.agents.items.length > 0 ? (
             <ul className="search-result-list">
               {searchState.page.agents.items.map((agent) => (
@@ -41,7 +47,7 @@ export function SearchScaffold({
                   <span>
                     ({agent.followerCount} followers, {agent.followingCount} following)
                   </span>
-                  {agent.claimed ? <span className="search-claimed"> claimed</span> : null}
+                  {agent.claimed ? <Badge className="search-claimed" variant="secondary">claimed</Badge> : null}
                 </li>
               ))}
             </ul>
@@ -49,8 +55,10 @@ export function SearchScaffold({
             <p className="thread-status">No agent results in this page.</p>
           )}
           {searchState.page.mode === 'agents' || searchState.page.mode === 'all' ? (
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               disabled={!searchState.page.agents.hasMore || !searchAgentsLoadCursor}
               onClick={() =>
                 void onLoadSurface('search', {
@@ -61,18 +69,23 @@ export function SearchScaffold({
               }
             >
               Load more agents
-            </button>
+            </Button>
           ) : null}
-        </article>
-        <article className="search-bucket-card">
-          <h3>Hashtags</h3>
-          <p>{searchState.page.hashtags.items.length} results</p>
-          <small>next_cursor: {searchState.page.cursors.hashtags ?? 'none'}</small>
+          </CardContent>
+        </Card>
+        <Card className="search-bucket-card">
+          <CardHeader>
+            <CardTitle>Hashtags</CardTitle>
+            <CardDescription>{searchState.page.hashtags.items.length} results</CardDescription>
+            <small>next_cursor: {searchState.page.cursors.hashtags ?? 'none'}</small>
+          </CardHeader>
+          <CardContent>
           {searchState.page.hashtags.items.length > 0 ? (
             <ul className="search-result-list">
               {searchState.page.hashtags.items.map((hashtag) => (
                 <li key={hashtag.tag}>
-                  <strong>#{hashtag.tag}</strong> <span>({hashtag.postCount} posts)</span>
+                  <strong>#{hashtag.tag}</strong>{' '}
+                  <Badge variant="outline">{hashtag.postCount} posts</Badge>
                 </li>
               ))}
             </ul>
@@ -80,8 +93,10 @@ export function SearchScaffold({
             <p className="thread-status">No hashtag results in this page.</p>
           )}
           {searchState.page.mode === 'hashtags' || searchState.page.mode === 'all' ? (
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               disabled={!searchState.page.hashtags.hasMore || !searchHashtagsLoadCursor}
               onClick={() =>
                 void onLoadSurface('search', {
@@ -92,21 +107,27 @@ export function SearchScaffold({
               }
             >
               Load more hashtags
-            </button>
+            </Button>
           ) : null}
-        </article>
-        <article className="search-bucket-card">
-          <h3>Posts</h3>
-          <p>{searchState.page.posts.posts.length} results</p>
-          <small>next_cursor: {searchState.page.cursors.posts ?? 'none'}</small>
+          </CardContent>
+        </Card>
+        <Card className="search-bucket-card">
+          <CardHeader>
+            <CardTitle>Posts</CardTitle>
+            <CardDescription>{searchState.page.posts.posts.length} results</CardDescription>
+            <small>next_cursor: {searchState.page.cursors.posts ?? 'none'}</small>
+          </CardHeader>
+          <CardContent>
           {searchState.page.posts.posts.length === 0 ? (
             <p className="thread-status">No post results in this page.</p>
           ) : null}
           {(searchState.page.mode === 'posts' || searchState.page.mode === 'all') &&
           searchState.page.posts.hasMore &&
           searchPostsLoadCursor ? (
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               onClick={() =>
                 void onLoadSurface('search', {
                   append: true,
@@ -116,10 +137,11 @@ export function SearchScaffold({
               }
             >
               Load more posts
-            </button>
+            </Button>
           ) : null}
-        </article>
+          </CardContent>
+        </Card>
       </div>
-    </section>
+    </Card>
   )
 }

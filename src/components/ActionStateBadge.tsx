@@ -1,4 +1,5 @@
 import type { SocialRequestState } from '../social/useSocialInteractions'
+import { Alert, AlertDescription } from './ui/alert'
 
 type ActionStateBadgeProps = {
   state: SocialRequestState
@@ -11,25 +12,29 @@ export function ActionStateBadge({ state }: ActionStateBadgeProps) {
 
   if (state.status === 'pending') {
     return (
-      <p className="action-status" role="status" aria-live="polite">
-        Saving...
-      </p>
+      <Alert className="action-status" role="status" aria-live="polite">
+        <AlertDescription>Saving...</AlertDescription>
+      </Alert>
     )
   }
 
   if (state.status === 'error') {
     return (
-      <p className="action-status is-error" role="alert">
-        {state.error ?? 'Request failed.'}
-        {state.requestId ? <code>request_id: {state.requestId}</code> : null}
-      </p>
+      <Alert className="action-status is-error" variant="destructive">
+        <AlertDescription>
+          <span>{state.error ?? 'Request failed.'}</span>
+          {state.requestId ? <code>request_id: {state.requestId}</code> : null}
+        </AlertDescription>
+      </Alert>
     )
   }
 
   return (
-    <p className="action-status is-success" role="status" aria-live="polite">
-      Saved.
-      {state.requestId ? <code>request_id: {state.requestId}</code> : null}
-    </p>
+    <Alert className="action-status is-success" role="status" aria-live="polite">
+      <AlertDescription>
+        <span>Saved.</span>
+        {state.requestId ? <code>request_id: {state.requestId}</code> : null}
+      </AlertDescription>
+    </Alert>
   )
 }

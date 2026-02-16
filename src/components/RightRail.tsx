@@ -1,4 +1,7 @@
 import type { UiPost } from '../api/adapters'
+import { Badge } from './ui/badge'
+import { Button } from './ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 
 type RightRailProps = {
   posts: UiPost[]
@@ -116,65 +119,77 @@ export function RightRail({
 
   return (
     <div className="right-rail-stack">
-      <section className="right-rail-card">
-        <div className="right-rail-card-header">
-          <h2>Leaderboard</h2>
-          <button type="button" className="right-rail-link" onClick={onOpenLeaderboard}>
+      <Card className="right-rail-card">
+        <CardHeader className="right-rail-card-header">
+          <CardTitle>Leaderboard</CardTitle>
+          <Button type="button" className="right-rail-link" variant="outline" size="sm" onClick={onOpenLeaderboard}>
             Open
-          </button>
-        </div>
-        {!hasData && statusText ? <p className="right-rail-empty">{statusText}</p> : null}
-        {!hasData && !statusText ? (
-          <p className="right-rail-empty">Load feed data to rank agents.</p>
-        ) : null}
-        <ol className="right-rail-list">
-          {leaderboard.map((entry, index) => (
-            <li key={entry.name}>
-              <span>{index + 1}. {entry.name}</span>
-              <strong>{entry.score}</strong>
-            </li>
-          ))}
-        </ol>
-      </section>
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {!hasData && statusText ? <CardDescription className="right-rail-empty">{statusText}</CardDescription> : null}
+          {!hasData && !statusText ? (
+            <CardDescription className="right-rail-empty">Load feed data to rank agents.</CardDescription>
+          ) : null}
+          <ol className="right-rail-list">
+            {leaderboard.map((entry, index) => (
+              <li key={entry.name}>
+                <span>{index + 1}. {entry.name}</span>
+                <Badge variant="outline">{entry.score}</Badge>
+              </li>
+            ))}
+          </ol>
+        </CardContent>
+      </Card>
 
-      <section className="right-rail-card">
-        <h2>Trending tags</h2>
-        {!hasData && statusText ? <p className="right-rail-empty">{statusText}</p> : null}
-        {!hasData && !statusText ? (
-          <p className="right-rail-empty">Hashtags appear after feed posts load.</p>
-        ) : null}
-        <ul className="right-rail-list">
-          {trendingTags.map((entry) => (
-            <li key={entry.tag}>
-              <button
-                type="button"
-                className="right-rail-link"
-                onClick={() => onSelectHashtag(entry.tag)}
-                aria-label={`Open hashtag ${entry.tag}`}
-              >
-                #{entry.tag}
-              </button>
-              <strong>{entry.count}</strong>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <Card className="right-rail-card">
+        <CardHeader>
+          <CardTitle>Trending tags</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!hasData && statusText ? <CardDescription className="right-rail-empty">{statusText}</CardDescription> : null}
+          {!hasData && !statusText ? (
+            <CardDescription className="right-rail-empty">Hashtags appear after feed posts load.</CardDescription>
+          ) : null}
+          <ul className="right-rail-list">
+            {trendingTags.map((entry) => (
+              <li key={entry.tag}>
+                <Button
+                  type="button"
+                  className="right-rail-link"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onSelectHashtag(entry.tag)}
+                  aria-label={`Open hashtag ${entry.tag}`}
+                >
+                  #{entry.tag}
+                </Button>
+                <Badge variant="secondary">{entry.count}</Badge>
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
 
-      <section className="right-rail-card">
-        <h2>Active agents</h2>
-        {!hasData && statusText ? <p className="right-rail-empty">{statusText}</p> : null}
-        {!hasData && !statusText ? (
-          <p className="right-rail-empty">Agent activity appears once posts are loaded.</p>
-        ) : null}
-        <ul className="right-rail-list">
-          {activeAgents.map((entry) => (
-            <li key={entry.name}>
-              <span>{entry.name}</span>
-              <strong>{entry.posts} posts</strong>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <Card className="right-rail-card">
+        <CardHeader>
+          <CardTitle>Active agents</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!hasData && statusText ? <CardDescription className="right-rail-empty">{statusText}</CardDescription> : null}
+          {!hasData && !statusText ? (
+            <CardDescription className="right-rail-empty">Agent activity appears once posts are loaded.</CardDescription>
+          ) : null}
+          <ul className="right-rail-list">
+            {activeAgents.map((entry) => (
+              <li key={entry.name}>
+                <span>{entry.name}</span>
+                <Badge variant="outline">{entry.posts} posts</Badge>
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
     </div>
   )
 }
