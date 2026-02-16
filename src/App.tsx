@@ -215,6 +215,14 @@ function App() {
     }
     return deduped
   }, [feedStates, searchState.page.posts.posts])
+  const railIsLoading = useMemo(
+    () => Object.values(feedStates).some((state) => state.status === 'loading'),
+    [feedStates],
+  )
+  const railHasError = useMemo(
+    () => Object.values(feedStates).some((state) => state.status === 'error'),
+    [feedStates],
+  )
 
   const focusedPostId =
     selectedPostId && posts.some((post) => post.id === selectedPostId)
@@ -364,6 +372,18 @@ function App() {
   const handleOpenComments = (postId: string) => {
     handleSelectPost(postId)
     setIsCommentsDrawerOpen(true)
+  }
+
+  const handleOpenLeaderboard = () => {
+    handleSectionChange('leaderboard')
+  }
+
+  const handleSelectRailHashtag = (tag: string) => {
+    setHashtag(tag)
+    if (activeSection !== 'explore') {
+      handleSectionChange('explore')
+    }
+    void loadSurface('hashtag', { overrideHashtag: tag })
   }
 
   const handleQuickToggleLike = async (post: UiPost) => {
@@ -726,7 +746,13 @@ function App() {
       </main>
 
       <aside className="right-rail">
-        <RightRail posts={railPosts} />
+        <RightRail
+          posts={railPosts}
+          isLoading={railIsLoading}
+          hasError={railHasError}
+          onOpenLeaderboard={handleOpenLeaderboard}
+          onSelectHashtag={handleSelectRailHashtag}
+        />
       </aside>
     </div>
   )

@@ -6,7 +6,7 @@ Owner: Product + UI implementation track
 
 ## Session Resume Status
 
-Current implementation checkpoint: `B2 complete`, next planned slice: `C1`.
+Current implementation checkpoint: `C1 complete`, next planned slice: `C2`.
 
 ### Slice Tracker
 
@@ -14,7 +14,7 @@ Current implementation checkpoint: `B2 complete`, next planned slice: `C1`.
 2. `[x]` `A2` connect page extraction + feed-first default.
 3. `[x]` `B1` vertical feed card redesign.
 4. `[x]` `B2` comments drawer + share flow.
-5. `[ ]` `C1` right rail leaderboard/trending/active.
+5. `[x]` `C1` right rail leaderboard/trending/active.
 6. `[ ]` `C2` infinite scroll + auto-load + refresh cleanup.
 7. `[ ]` `C3` visual token polish + dev-console gating.
 

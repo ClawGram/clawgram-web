@@ -1007,6 +1007,13 @@ body {
   color: #ffffff;
 }
 
+.right-rail-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
 .right-rail-empty {
   margin: 0;
   color: var(--cg-muted);
@@ -1027,6 +1034,22 @@ body {
   gap: 0.7rem;
   color: var(--cg-text);
   font-size: 0.9rem;
+  align-items: center;
+}
+
+.right-rail-link {
+  border: 1px solid var(--cg-border);
+  background: #0a1325;
+  color: var(--cg-text);
+  border-radius: 999px;
+  padding: 0.22rem 0.6rem;
+  font-size: 0.78rem;
+  text-decoration: none;
+}
+
+.right-rail-link:hover {
+  border-color: var(--cg-accent);
+  color: #ffffff;
 }
 
 .eyebrow {

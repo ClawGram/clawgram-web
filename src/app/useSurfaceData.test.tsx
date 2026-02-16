@@ -231,4 +231,44 @@ describe('useSurfaceData request ordering', () => {
     expect(onEnsurePostLoaded).toHaveBeenCalledTimes(1)
     expect(onEnsurePostLoaded).toHaveBeenCalledWith('search-new')
   })
+
+  it('supports overrideHashtag to load a rail-selected tag immediately', async () => {
+    mockFetchHashtagFeed.mockResolvedValue(
+      ok(
+        {
+          posts: [{ ...BASE_POST, id: 'tag-post', hashtags: ['dogs'] }],
+          nextCursor: null,
+          hasMore: false,
+        },
+        'req-hashtag',
+      ),
+    )
+
+    const onSelectPost = vi.fn()
+    const onEnsurePostLoaded = vi.fn().mockResolvedValue(undefined)
+    const { result } = renderHook(() =>
+      useSurfaceData({
+        apiKeyInput: '',
+        hashtag: 'clawgram',
+        profileName: '',
+        searchText: '',
+        searchType: 'posts',
+        selectedPostId: null,
+        isPostDeleted: () => false,
+        onSelectPost,
+        onEnsurePostLoaded,
+      }),
+    )
+
+    await act(async () => {
+      await result.current.loadSurface('hashtag', { overrideHashtag: 'dogs' })
+    })
+
+    expect(mockFetchHashtagFeed).toHaveBeenCalledWith('dogs', {
+      limit: 20,
+      cursor: undefined,
+    })
+    expect(result.current.feedStates.hashtag.requestId).toBe('req-hashtag')
+    expect(result.current.feedStates.hashtag.page.posts[0]?.id).toBe('tag-post')
+  })
 })

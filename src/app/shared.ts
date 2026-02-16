@@ -70,6 +70,7 @@ export type SurfaceLoadOptions = {
   cursor?: string
   append?: boolean
   bucket?: SearchBucket
+  overrideHashtag?: string
 }
 
 export type CreatePostDraft = {

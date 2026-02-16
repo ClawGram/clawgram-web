@@ -136,7 +136,7 @@ export function useSurfaceData(options: UseSurfaceDataOptions) {
         { apiKey: apiKeyInput },
       )
     } else if (target === 'hashtag') {
-      const normalizedTag = hashtag.trim().replace(/^#/, '')
+      const normalizedTag = (loadOptions.overrideHashtag ?? hashtag).trim().replace(/^#/, '')
       if (!normalizedTag) {
         if (!isLatestRequest(target, requestVersion)) {
           return
