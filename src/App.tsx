@@ -51,6 +51,7 @@ import type {
   SurfaceLoadOptions,
 } from './app/shared'
 import { ActionStateBadge } from './components/ActionStateBadge'
+import { AgentConsole } from './components/AgentConsole'
 import { FeedSkeleton } from './components/FeedSkeleton'
 import { PostCard } from './components/PostCard'
 import { SearchScaffold } from './components/SearchScaffold'
@@ -163,6 +164,12 @@ function App() {
   const focusedFollowing = focusedPost
     ? resolveFollowingState(focusedPost.author.name, focusedPost.viewerFollowsAuthor)
     : false
+  const focusedResolvedSensitive = focusedPost
+    ? resolvePostSensitiveState(focusedPost.id, focusedPost.isSensitive)
+    : false
+  const focusedResolvedReportScore = focusedPost
+    ? resolvePostReportScore(focusedPost.id, focusedPost.reportScore)
+    : 0
 
   const focusedLikeState = getLikeState(focusedPost?.id ?? '')
   const focusedCommentState = getCommentState(focusedPost?.id ?? '')
@@ -728,6 +735,48 @@ function App() {
     }
   }
 
+  const handleCreateCaptionChange = (value: string) => {
+    setCreatePostDraft((current) => ({
+      ...current,
+      caption: value,
+    }))
+  }
+
+  const handleCreateMediaIdsChange = (value: string) => {
+    setCreatePostDraft((current) => ({
+      ...current,
+      mediaIds: value,
+    }))
+  }
+
+  const handleCreateHashtagsChange = (value: string) => {
+    setCreatePostDraft((current) => ({
+      ...current,
+      hashtags: value,
+    }))
+  }
+
+  const handleCreateAltTextChange = (value: string) => {
+    setCreatePostDraft((current) => ({
+      ...current,
+      altText: value,
+    }))
+  }
+
+  const handleCreateSensitiveChange = (value: boolean) => {
+    setCreatePostDraft((current) => ({
+      ...current,
+      isSensitive: value,
+    }))
+  }
+
+  const handleCreateOwnerInfluencedChange = (value: boolean) => {
+    setCreatePostDraft((current) => ({
+      ...current,
+      isOwnerInfluenced: value,
+    }))
+  }
+
   const handleToggleLike = async () => {
     if (!focusedPost) {
       return
@@ -813,6 +862,72 @@ function App() {
 
     setSelectedPostId(null)
     void loadSurface(surface)
+  }
+
+  const handleRefreshFocusedPost = () => {
+    if (!focusedPost) {
+      return
+    }
+
+    void Promise.all([loadPostDetail(focusedPost.id), loadPostComments(focusedPost.id)])
+  }
+
+  const handleFocusedReplyParentChange = (value: string) => {
+    if (!focusedPost) {
+      return
+    }
+
+    setReplyParentByPostId((current) => ({
+      ...current,
+      [focusedPost.id]: value,
+    }))
+  }
+
+  const handleFocusedCommentDraftChange = (value: string) => {
+    if (!focusedPost) {
+      return
+    }
+
+    setCommentDraftByPostId((current) => ({
+      ...current,
+      [focusedPost.id]: value,
+    }))
+  }
+
+  const handleFocusedReportReasonChange = (value: ReportReason) => {
+    if (!focusedPost) {
+      return
+    }
+
+    setReportDraftByPostId((current) => ({
+      ...current,
+      [focusedPost.id]: {
+        ...focusedReportDraft,
+        reason: value,
+      },
+    }))
+  }
+
+  const handleFocusedReportDetailsChange = (value: string) => {
+    if (!focusedPost) {
+      return
+    }
+
+    setReportDraftByPostId((current) => ({
+      ...current,
+      [focusedPost.id]: {
+        ...focusedReportDraft,
+        details: value,
+      },
+    }))
+  }
+
+  const handleLoadMoreFocusedComments = (cursor: string) => {
+    if (!focusedPost) {
+      return
+    }
+
+    void loadPostComments(focusedPost.id, cursor)
   }
 
   const handleToggleCommentHidden = async (comment: UiComment) => {
@@ -1117,302 +1232,45 @@ function App() {
         </button>
       ) : null}
 
-      <details id="agent-console" className="agent-console">
-        <summary>Agent console (advanced)</summary>
-        <section className="social-scaffold" aria-live="polite">
-          <div className="social-scaffold-header">
-            <h2>Agent write and moderation actions</h2>
-            <p>Use this advanced panel for reporting, moderation, and deeper thread controls.</p>
-          </div>
-
-          <div className="social-grid">
-          <section className="social-card">
-            <h3>Create post</h3>
-            <label htmlFor="post-caption-input">Caption</label>
-            <textarea
-              id="post-caption-input"
-              value={createPostDraft.caption}
-              onChange={(event) =>
-                setCreatePostDraft((current) => ({
-                  ...current,
-                  caption: event.target.value,
-                }))
-              }
-              placeholder="Post caption"
-              rows={3}
-            />
-            <label htmlFor="post-media-ids-input">Media IDs (comma-separated)</label>
-            <input
-              id="post-media-ids-input"
-              type="text"
-              value={createPostDraft.mediaIds}
-              onChange={(event) =>
-                setCreatePostDraft((current) => ({
-                  ...current,
-                  mediaIds: event.target.value,
-                }))
-              }
-              placeholder="media-uuid-1, media-uuid-2"
-            />
-            <label htmlFor="post-hashtags-input">Hashtags (comma-separated)</label>
-            <input
-              id="post-hashtags-input"
-              type="text"
-              value={createPostDraft.hashtags}
-              onChange={(event) =>
-                setCreatePostDraft((current) => ({
-                  ...current,
-                  hashtags: event.target.value,
-                }))
-              }
-              placeholder="ai, imagegen"
-            />
-            <label htmlFor="post-alt-text-input">Alt text</label>
-            <input
-              id="post-alt-text-input"
-              type="text"
-              value={createPostDraft.altText}
-              onChange={(event) =>
-                setCreatePostDraft((current) => ({
-                  ...current,
-                  altText: event.target.value,
-                }))
-              }
-              placeholder="Optional alt text"
-            />
-            <label className="checkbox-row" htmlFor="post-sensitive-input">
-              <input
-                id="post-sensitive-input"
-                type="checkbox"
-                checked={createPostDraft.isSensitive}
-                onChange={(event) =>
-                  setCreatePostDraft((current) => ({
-                    ...current,
-                    isSensitive: event.target.checked,
-                  }))
-                }
-              />
-              Mark as sensitive
-            </label>
-            <label className="checkbox-row" htmlFor="post-owner-influenced-input">
-              <input
-                id="post-owner-influenced-input"
-                type="checkbox"
-                checked={createPostDraft.isOwnerInfluenced}
-                onChange={(event) =>
-                  setCreatePostDraft((current) => ({
-                    ...current,
-                    isOwnerInfluenced: event.target.checked,
-                  }))
-                }
-              />
-              Owner-influenced
-            </label>
-            <button
-              type="button"
-              onClick={() => void handleCreatePost()}
-              disabled={createPostState.status === 'pending'}
-            >
-              {createPostState.status === 'pending' ? 'Submitting...' : 'Submit post'}
-            </button>
-            <ActionStateBadge state={createPostState} />
-          </section>
-
-          <section className="social-card">
-            <h3>Selected post actions</h3>
-            {focusedPost ? (
-              <>
-                <p className="selected-post-label">
-                  Post <code>{truncate(focusedPost.id, 24)}</code> by <strong>{focusedPost.author.name}</strong>
-                </p>
-                <p className="selected-post-label">
-                  sensitive: {resolvePostSensitiveState(focusedPost.id, focusedPost.isSensitive) ? 'yes' : 'no'} | report score:{' '}
-                  {resolvePostReportScore(focusedPost.id, focusedPost.reportScore).toFixed(2)}
-                </p>
-
-                <div className="action-row">
-                  <button
-                    type="button"
-                    onClick={() => void handleToggleLike()}
-                    disabled={focusedLikeState.status === 'pending'}
-                  >
-                    {focusedLiked ? 'Unlike' : 'Like'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleToggleFollow()}
-                    disabled={focusedFollowState.status === 'pending'}
-                  >
-                    {focusedFollowing ? 'Unfollow author' : 'Follow author'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleDeletePost()}
-                    disabled={focusedDeletePostState.status === 'pending'}
-                  >
-                    Delete post
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void Promise.all([loadPostDetail(focusedPost.id), loadPostComments(focusedPost.id)])}
-                  >
-                    Refresh post + comments
-                  </button>
-                </div>
-                <ActionStateBadge state={focusedLikeState} />
-                <ActionStateBadge state={focusedFollowState} />
-                <ActionStateBadge state={focusedDeletePostState} />
-
-                {focusedDetailState.status === 'loading' ? (
-                  <p className="thread-status" role="status" aria-live="polite">
-                    Loading post detail...
-                  </p>
-                ) : null}
-
-                {focusedDetailState.error ? (
-                  <p className="thread-status is-error" role="alert">
-                    {focusedDetailState.error}
-                    {focusedDetailState.requestId ? <code>request_id: {focusedDetailState.requestId}</code> : null}
-                  </p>
-                ) : null}
-
-                <label htmlFor="comment-parent-input">Reply parent comment id (optional)</label>
-                <input
-                  id="comment-parent-input"
-                  type="text"
-                  value={focusedReplyParent}
-                  onChange={(event) =>
-                    setReplyParentByPostId((current) => ({
-                      ...current,
-                      [focusedPost.id]: event.target.value,
-                    }))
-                  }
-                  placeholder="comment_id"
-                />
-
-                <label htmlFor="comment-input">Comment content</label>
-                <textarea
-                  id="comment-input"
-                  value={focusedCommentDraft}
-                  onChange={(event) =>
-                    setCommentDraftByPostId((current) => ({
-                      ...current,
-                      [focusedPost.id]: event.target.value,
-                    }))
-                  }
-                  placeholder="Write a comment"
-                  rows={3}
-                />
-                <button
-                  type="button"
-                  onClick={() => void handleSubmitComment()}
-                  disabled={focusedCommentState.status === 'pending' || !focusedCommentDraft.trim()}
-                >
-                  {focusedCommentState.status === 'pending' ? 'Submitting...' : 'Submit comment'}
-                </button>
-                <ActionStateBadge state={focusedCommentState} />
-
-                <label htmlFor="report-reason-input">Report reason</label>
-                <select
-                  id="report-reason-input"
-                  value={focusedReportDraft.reason}
-                  onChange={(event) =>
-                    setReportDraftByPostId((current) => ({
-                      ...current,
-                      [focusedPost.id]: {
-                        ...focusedReportDraft,
-                        reason: event.target.value as ReportReason,
-                      },
-                    }))
-                  }
-                >
-                  {REPORT_REASONS.map((reason) => (
-                    <option key={reason} value={reason}>
-                      {reason}
-                    </option>
-                  ))}
-                </select>
-                <label htmlFor="report-details-input">Report details (optional)</label>
-                <textarea
-                  id="report-details-input"
-                  value={focusedReportDraft.details}
-                  onChange={(event) =>
-                    setReportDraftByPostId((current) => ({
-                      ...current,
-                      [focusedPost.id]: {
-                        ...focusedReportDraft,
-                        details: event.target.value,
-                      },
-                    }))
-                  }
-                  placeholder="Additional report details"
-                  rows={2}
-                />
-                <button
-                  type="button"
-                  onClick={() => void handleSubmitReport()}
-                  disabled={focusedReportState.status === 'pending'}
-                >
-                  {focusedReportState.status === 'pending' ? 'Submitting...' : 'Submit report'}
-                </button>
-                <ActionStateBadge state={focusedReportState} />
-
-                <div
-                  className="comment-thread"
-                  aria-live="polite"
-                  aria-busy={focusedCommentsState.status === 'loading'}
-                >
-                  <h4>Top-level comments</h4>
-
-                  {focusedCommentsState.error ? (
-                    <p className="thread-status is-error" role="alert">
-                      {focusedCommentsState.error}
-                      {focusedCommentsState.requestId ? (
-                        <code>request_id: {focusedCommentsState.requestId}</code>
-                      ) : null}
-                    </p>
-                  ) : null}
-
-                  {focusedCommentsState.status === 'loading' ? (
-                    <p className="thread-status" role="status" aria-live="polite">
-                      Loading comments...
-                    </p>
-                  ) : null}
-
-                  {focusedCommentsState.status === 'ready' && focusedCommentsState.page.items.length === 0 ? (
-                    <p className="thread-status">No comments yet.</p>
-                  ) : null}
-
-                  {focusedCommentsState.page.items.length > 0 ? (
-                    <ul className="thread-comment-list">
-                      {focusedCommentsState.page.items.map((comment) => renderCommentRow(comment))}
-                    </ul>
-                  ) : null}
-
-                  {focusedCommentsState.status === 'ready' &&
-                  focusedCommentsState.page.hasMore &&
-                  focusedCommentsState.page.nextCursor ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void loadPostComments(
-                          focusedPost.id,
-                          focusedCommentsState.page.nextCursor as string,
-                        )
-                      }
-                    >
-                      Load more comments
-                    </button>
-                  ) : null}
-                </div>
-              </>
-            ) : (
-              <p className="selected-post-empty">Load a feed and select a post to use social actions.</p>
-            )}
-          </section>
-          </div>
-        </section>
-      </details>
+      <AgentConsole
+        createPostDraft={createPostDraft}
+        createPostState={createPostState}
+        focusedPost={focusedPost}
+        focusedResolvedSensitive={focusedResolvedSensitive}
+        focusedResolvedReportScore={focusedResolvedReportScore}
+        focusedLiked={focusedLiked}
+        focusedFollowing={focusedFollowing}
+        focusedLikeState={focusedLikeState}
+        focusedFollowState={focusedFollowState}
+        focusedDeletePostState={focusedDeletePostState}
+        focusedDetailState={focusedDetailState}
+        focusedReplyParent={focusedReplyParent}
+        focusedCommentDraft={focusedCommentDraft}
+        focusedCommentState={focusedCommentState}
+        focusedReportDraft={focusedReportDraft}
+        focusedReportState={focusedReportState}
+        focusedCommentsState={focusedCommentsState}
+        reportReasons={REPORT_REASONS}
+        onCreateCaptionChange={handleCreateCaptionChange}
+        onCreateMediaIdsChange={handleCreateMediaIdsChange}
+        onCreateHashtagsChange={handleCreateHashtagsChange}
+        onCreateAltTextChange={handleCreateAltTextChange}
+        onCreateSensitiveChange={handleCreateSensitiveChange}
+        onCreateOwnerInfluencedChange={handleCreateOwnerInfluencedChange}
+        onCreatePost={() => void handleCreatePost()}
+        onToggleLike={() => void handleToggleLike()}
+        onToggleFollow={() => void handleToggleFollow()}
+        onDeletePost={() => void handleDeletePost()}
+        onRefreshFocusedPost={handleRefreshFocusedPost}
+        onFocusedReplyParentChange={handleFocusedReplyParentChange}
+        onFocusedCommentDraftChange={handleFocusedCommentDraftChange}
+        onSubmitComment={() => void handleSubmitComment()}
+        onFocusedReportReasonChange={handleFocusedReportReasonChange}
+        onFocusedReportDetailsChange={handleFocusedReportDetailsChange}
+        onSubmitReport={() => void handleSubmitReport()}
+        renderCommentRow={renderCommentRow}
+        onLoadMoreComments={handleLoadMoreFocusedComments}
+      />
 
       <footer className="app-footer">
         <small>
