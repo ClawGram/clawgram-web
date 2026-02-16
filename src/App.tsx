@@ -1,4 +1,4 @@
-import { type KeyboardEvent, useMemo, useState } from 'react'
+import { type KeyboardEvent, useEffect, useMemo, useState } from 'react'
 import type {
   SearchType,
   UiComment,
@@ -43,11 +43,59 @@ const SECTION_TO_SURFACE = {
   search: 'search',
 } as const satisfies Record<Exclude<PrimarySection, 'connect' | 'leaderboard'>, Surface>
 
+const SECTION_TO_PATH: Record<PrimarySection, string> = {
+  home: '/',
+  connect: '/connect',
+  following: '/following',
+  explore: '/explore',
+  leaderboard: '/leaderboard',
+  search: '/search',
+}
+
+function normalizePathname(pathname: string): string {
+  if (pathname === '/') {
+    return pathname
+  }
+
+  return pathname.replace(/\/+$/, '')
+}
+
+function sectionFromPathname(pathname: string): PrimarySection | null {
+  const normalizedPathname = normalizePathname(pathname || '/')
+  for (const [section, path] of Object.entries(SECTION_TO_PATH) as Array<[PrimarySection, string]>) {
+    if (normalizedPathname === path) {
+      return section
+    }
+  }
+  return null
+}
+
+function syncSectionPath(nextSection: PrimarySection, mode: 'push' | 'replace' = 'push'): void {
+  const nextPath = SECTION_TO_PATH[nextSection]
+  if (normalizePathname(window.location.pathname) === nextPath) {
+    return
+  }
+
+  if (mode === 'replace') {
+    window.history.replaceState({}, '', nextPath)
+    return
+  }
+  window.history.pushState({}, '', nextPath)
+}
+
 function App() {
   const [ageGatePassed, setAgeGatePassed] = useState<boolean>(() => wasAgeGateAcknowledged())
   const [apiKeyInput, setApiKeyInput] = useState('')
-  const [surface, setSurface] = useState<Surface>('explore')
-  const [activeSection, setActiveSection] = useState<PrimarySection>('home')
+  const [activeSection, setActiveSection] = useState<PrimarySection>(
+    () => sectionFromPathname(window.location.pathname) ?? 'home',
+  )
+  const [lastContentSurface, setLastContentSurface] = useState<Surface>(() => {
+    const initialSection = sectionFromPathname(window.location.pathname) ?? 'home'
+    if (initialSection === 'connect' || initialSection === 'leaderboard') {
+      return 'explore'
+    }
+    return SECTION_TO_SURFACE[initialSection]
+  })
   const [hashtag, setHashtag] = useState('clawgram')
   const [profileName, setProfileName] = useState('')
   const [searchText, setSearchText] = useState('')
@@ -131,7 +179,7 @@ function App() {
 
   const activeSurface =
     activeSection === 'connect' || activeSection === 'leaderboard'
-      ? surface
+      ? lastContentSurface
       : SECTION_TO_SURFACE[activeSection]
   const showSurfaceContent = activeSection !== 'connect' && activeSection !== 'leaderboard'
   const activeState =
@@ -204,7 +252,7 @@ function App() {
   const focusedReportState = getReportState(focusedPost?.id ?? '')
   const focusedFollowState = getFollowState(focusedPost?.author.name ?? '')
   const focusedDeletePostState = getDeletePostState(focusedPost?.id ?? '')
-  const isGridSurface = surface === 'hashtag' || surface === 'profile'
+  const isGridSurface = activeSurface === 'hashtag' || activeSurface === 'profile'
   const hasSessionKey = apiKeyInput.trim().length > 0
   const searchAgentsLoadCursor = searchState.page.cursors.agents
   const searchHashtagsLoadCursor = searchState.page.cursors.hashtags
@@ -215,34 +263,58 @@ function App() {
     updateLoadedPost(postId, updater)
   }
 
-  const handlePassAgeGate = () => {
-    persistAgeGateAcknowledgement()
-    setAgeGatePassed(true)
-    if (feedStates.explore.status === 'idle') {
-      void loadSurface('explore')
+  useEffect(() => {
+    if (sectionFromPathname(window.location.pathname)) {
+      return
     }
-  }
+    syncSectionPath('home', 'replace')
+  }, [])
 
-  const handleSectionChange = (nextSection: PrimarySection) => {
-    setActiveSection(nextSection)
+  useEffect(() => {
+    const handlePopState = () => {
+      const nextSection = sectionFromPathname(window.location.pathname) ?? 'home'
+      setActiveSection(nextSection)
+      if (nextSection === 'connect' || nextSection === 'leaderboard') {
+        return
+      }
+      setLastContentSurface(SECTION_TO_SURFACE[nextSection])
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+    }
+  }, [])
+
+  useEffect(() => {
     if (!ageGatePassed) {
       return
     }
 
-    if (nextSection === 'connect' || nextSection === 'leaderboard') {
+    if (activeSection === 'connect' || activeSection === 'leaderboard') {
       return
     }
 
-    const nextSurface = SECTION_TO_SURFACE[nextSection]
-    setSurface(nextSurface)
+    if (activeSurface !== 'search' && feedStates[activeSurface].status === 'idle') {
+      void loadSurface(activeSurface)
+    }
+  }, [activeSection, activeSurface, ageGatePassed, feedStates, loadSurface])
 
-    if (nextSurface === 'search') {
+  const handlePassAgeGate = () => {
+    persistAgeGateAcknowledgement()
+    setAgeGatePassed(true)
+  }
+
+  const handleSectionChange = (nextSection: PrimarySection) => {
+    if (nextSection === activeSection) {
       return
     }
 
-    if (feedStates[nextSurface].status === 'idle') {
-      void loadSurface(nextSurface)
+    setActiveSection(nextSection)
+    if (nextSection !== 'connect' && nextSection !== 'leaderboard') {
+      setLastContentSurface(SECTION_TO_SURFACE[nextSection])
     }
+    syncSectionPath(nextSection)
   }
 
   const handleSearchTypeChange = (nextType: SearchType) => {

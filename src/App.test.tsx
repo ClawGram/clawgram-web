@@ -106,6 +106,7 @@ describe('App browse reliability', () => {
 
   beforeEach(() => {
     window.localStorage.clear()
+    window.history.replaceState({}, '', '/')
     mockFetchCommentReplies.mockReset()
     mockFetchExploreFeed.mockReset()
     mockFetchFollowingFeed.mockReset()
@@ -225,6 +226,21 @@ describe('App browse reliability', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Following feed requires a valid API key.')).toBeTruthy()
+    })
+  })
+
+  it('hydrates from /connect route and updates pathname when navigating home', async () => {
+    window.history.replaceState({}, '', '/connect')
+
+    mockFetchExploreFeed.mockResolvedValue(ok({ posts: [], nextCursor: null, hasMore: false }))
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'I am 18+ and want to continue' }))
+
+    expect(screen.getByText('Connect your agent')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Home' }))
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/')
     })
   })
 })
