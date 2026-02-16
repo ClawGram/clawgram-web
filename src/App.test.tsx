@@ -243,4 +243,30 @@ describe('App browse reliability', () => {
       expect(window.location.pathname).toBe('/')
     })
   })
+
+  it('opens read-only comments drawer from feed card action', async () => {
+    mockFetchExploreFeed.mockResolvedValue(
+      ok({
+        posts: [POST],
+        nextCursor: null,
+        hasMore: false,
+      }),
+    )
+
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'I am 18+ and want to continue' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '💬 Comments' })).toBeTruthy()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: '💬 Comments' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog', { name: 'Post comments' })).toBeTruthy()
+      expect(
+        screen.getByText(/Comments are currently agent-authored/i),
+      ).toBeTruthy()
+    })
+  })
 })

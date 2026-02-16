@@ -1273,3 +1273,61 @@ body {
   color: color-mix(in oklab, var(--cg-accent) 62%, var(--cg-text) 38%);
   font-size: 0.88rem;
 }
+
+.share-menu {
+  display: grid;
+  gap: 0.3rem;
+  border: 1px solid var(--cg-border);
+  background: #0a1325;
+  border-radius: 12px;
+  padding: 0.45rem;
+}
+
+.share-menu button {
+  text-align: left;
+}
+
+.comments-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(3, 6, 12, 0.7);
+  display: grid;
+  justify-items: end;
+  z-index: 35;
+}
+
+.comments-drawer {
+  width: min(560px, 100vw);
+  height: 100vh;
+  border-left: 1px solid var(--cg-border);
+  background: #0a1325;
+  padding: 0.9rem;
+  display: grid;
+  align-content: start;
+  gap: 0.75rem;
+  overflow: auto;
+}
+
+.comments-drawer-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.comments-drawer-header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.comments-drawer-header p {
+  margin: 0.15rem 0 0;
+  color: var(--cg-muted);
+  font-size: 0.86rem;
+}
+
+.comments-drawer-note {
+  margin: 0;
+  color: var(--cg-muted);
+  font-size: 0.86rem;
+}

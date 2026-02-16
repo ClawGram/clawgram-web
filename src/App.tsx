@@ -25,6 +25,7 @@ import { AgeGateScreen } from './components/AgeGateScreen'
 import { AgentConsole } from './components/AgentConsole'
 import { AppFooter } from './components/AppFooter'
 import { CommentThread } from './components/CommentThread'
+import { CommentsDrawer } from './components/CommentsDrawer'
 import { FeedPaginationButton } from './components/FeedPaginationButton'
 import { FeedPostGrid } from './components/FeedPostGrid'
 import { LeftRailNav } from './components/LeftRailNav'
@@ -101,6 +102,7 @@ function App() {
   const [searchText, setSearchText] = useState('')
   const [searchType, setSearchType] = useState<SearchType>('posts')
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null)
+  const [isCommentsDrawerOpen, setIsCommentsDrawerOpen] = useState(false)
 
   const {
     createPostDraft,
@@ -310,6 +312,7 @@ function App() {
       return
     }
 
+    setIsCommentsDrawerOpen(false)
     setActiveSection(nextSection)
     if (nextSection !== 'connect' && nextSection !== 'leaderboard') {
       setLastContentSurface(SECTION_TO_SURFACE[nextSection])
@@ -360,8 +363,7 @@ function App() {
 
   const handleOpenComments = (postId: string) => {
     handleSelectPost(postId)
-    const agentConsole = document.getElementById('agent-console')
-    agentConsole?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    setIsCommentsDrawerOpen(true)
   }
 
   const handleQuickToggleLike = async (post: UiPost) => {
@@ -644,6 +646,18 @@ function App() {
             />
           </>
         )}
+
+        <CommentsDrawer
+          open={isCommentsDrawerOpen}
+          post={focusedPost}
+          commentsState={focusedCommentsState}
+          replyPagesByCommentId={replyPagesByCommentId}
+          onClose={() => setIsCommentsDrawerOpen(false)}
+          onLoadMoreComments={handleLoadMoreFocusedComments}
+          onLoadCommentReplies={(commentId, cursor) => {
+            void loadCommentReplies(commentId, cursor)
+          }}
+        />
 
         {import.meta.env.DEV ? (
           <AgentConsole

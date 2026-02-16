@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { UiPost } from '../api/adapters'
 import { formatTimestamp } from '../app/shared'
 import type { SocialRequestState } from '../social/useSocialInteractions'
@@ -34,12 +35,12 @@ export function PostCard({
   onToggleFollow,
   onOpenComments,
 }: PostCardProps) {
+  const [shareMenuOpen, setShareMenuOpen] = useState(false)
   const imageUrl = post.imageUrls[0] ?? null
   const shouldBlur = isSensitive && !isSensitiveRevealed
+  const shareUrl = `${window.location.origin}/posts/${encodeURIComponent(post.id)}`
 
   const handleShare = async () => {
-    const shareUrl = `${window.location.origin}/posts/${encodeURIComponent(post.id)}`
-
     if (typeof navigator.share === 'function') {
       try {
         await navigator.share({
@@ -47,17 +48,41 @@ export function PostCard({
           text: post.caption || 'Check this AI post',
           url: shareUrl,
         })
+        setShareMenuOpen(false)
         return
       } catch {
         // If native share is cancelled/unavailable, fallback to clipboard.
       }
     }
+    setShareMenuOpen((current) => !current)
+  }
 
+  const handleCopyShareLink = async () => {
     try {
       await navigator.clipboard.writeText(shareUrl)
     } catch {
       window.prompt('Copy post URL', shareUrl)
     }
+    setShareMenuOpen(false)
+  }
+
+  const handleOpenShareTarget = (target: 'x' | 'whatsapp' | 'telegram' | 'email') => {
+    const encodedUrl = encodeURIComponent(shareUrl)
+    const encodedText = encodeURIComponent(post.caption || `Check out ${post.author.name} on Clawgram`)
+
+    if (target === 'x') {
+      window.open(`https://x.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`, '_blank')
+    } else if (target === 'whatsapp') {
+      window.open(`https://wa.me/?text=${encodedText}%20${encodedUrl}`, '_blank')
+    } else if (target === 'telegram') {
+      window.open(`https://t.me/share/url?url=${encodedUrl}&text=${encodedText}`, '_blank')
+    } else {
+      window.location.href = `mailto:?subject=${encodeURIComponent(
+        `Clawgram post by ${post.author.name}`,
+      )}&body=${encodedText}%0A%0A${encodedUrl}`
+    }
+
+    setShareMenuOpen(false)
   }
 
   return (
@@ -140,6 +165,8 @@ export function PostCard({
           <button
             type="button"
             className="feed-icon-button"
+            aria-haspopup="menu"
+            aria-expanded={shareMenuOpen}
             onClick={() => {
               void handleShare()
             }}
@@ -147,6 +174,26 @@ export function PostCard({
             ↗ Share
           </button>
         </div>
+
+        {shareMenuOpen ? (
+          <div className="share-menu" role="menu" aria-label="Share options">
+            <button type="button" role="menuitem" onClick={() => void handleCopyShareLink()}>
+              Copy link
+            </button>
+            <button type="button" role="menuitem" onClick={() => handleOpenShareTarget('x')}>
+              Share on X
+            </button>
+            <button type="button" role="menuitem" onClick={() => handleOpenShareTarget('whatsapp')}>
+              Share on WhatsApp
+            </button>
+            <button type="button" role="menuitem" onClick={() => handleOpenShareTarget('telegram')}>
+              Share on Telegram
+            </button>
+            <button type="button" role="menuitem" onClick={() => handleOpenShareTarget('email')}>
+              Share via Email
+            </button>
+          </div>
+        ) : null}
 
         <div className="post-stats-row">
           <span>{post.likeCount} likes</span>
