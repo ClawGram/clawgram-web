@@ -9,7 +9,28 @@
 
 .app-header {
   display: grid;
-  gap: 0.5rem;
+  gap: 0.6rem;
+}
+
+.app-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.how-to-link {
+  border: 1px solid #d0d5dd;
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+  text-decoration: none;
+  color: #1d2939;
+  background: #ffffff;
+  font-size: 0.88rem;
+}
+
+.how-to-link:hover {
+  border-color: #98a2b3;
 }
 
 .eyebrow {
@@ -29,6 +50,27 @@
   margin: 0;
   color: #475467;
   max-width: 70ch;
+}
+
+.session-bar {
+  border: 1px solid #e4e7ec;
+  border-radius: 12px;
+  padding: 0.75rem 0.9rem;
+  background: #ffffff;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.session-bar label {
+  font-size: 0.86rem;
+  color: #344054;
+}
+
+.session-bar input {
+  border-radius: 8px;
+  border: 1px solid #d0d5dd;
+  padding: 0.55rem 0.65rem;
+  font: inherit;
 }
 
 .join-panel {
@@ -363,6 +405,18 @@ select:focus-visible {
   font-size: 0.84rem;
 }
 
+.post-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.post-inline-hint {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #667085;
+}
+
 .post-created {
   margin: 0;
   color: #667085;
@@ -412,6 +466,25 @@ select:focus-visible {
   border-color: #175cd3;
   background: #eff4ff;
   color: #1849a9;
+}
+
+.agent-console {
+  border: 1px solid #d0d5dd;
+  border-radius: 12px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.agent-console summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 0.85rem 1rem;
+  font-weight: 600;
+  color: #1d2939;
+}
+
+.agent-console[open] summary {
+  border-bottom: 1px solid #eaecf0;
 }
 
 .social-scaffold {
@@ -603,6 +676,45 @@ select:focus-visible {
   justify-self: start;
 }
 
+.post-grid.is-skeleton {
+  opacity: 0.88;
+}
+
+.skeleton-card {
+  border-color: #eaecf0;
+}
+
+.skeleton-block {
+  background: linear-gradient(90deg, #eef2f6 0%, #f7f9fc 50%, #eef2f6 100%);
+  background-size: 220% 100%;
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.skeleton-line {
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #eef2f6 0%, #f7f9fc 50%, #eef2f6 100%);
+  background-size: 220% 100%;
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.skeleton-line.short {
+  width: 35%;
+}
+
+.skeleton-line.medium {
+  width: 65%;
+}
+
+@keyframes skeleton-pulse {
+  0% {
+    background-position: 220% 0;
+  }
+  100% {
+    background-position: -40% 0;
+  }
+}
+
 .search-scaffold {
   border: 1px solid #d0d5dd;
   border-radius: 12px;
@@ -711,6 +823,15 @@ select:focus-visible {
 @media (max-width: 640px) {
   .app-shell {
     padding: 1rem 0.8rem 1.3rem;
+  }
+
+  .app-title-row {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .how-to-link {
+    align-self: flex-start;
   }
 
   .surface-controls input {
