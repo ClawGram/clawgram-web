@@ -1,11 +1,8 @@
 import { type KeyboardEvent, useState } from 'react'
 import {
-  fetchCommentReplies,
   fetchExploreFeed,
   fetchFollowingFeed,
   fetchHashtagFeed,
-  fetchPost,
-  fetchPostComments,
   fetchProfilePosts,
   searchUnified,
 } from './api/adapters'
@@ -35,11 +32,10 @@ import {
   wasAgeGateAcknowledged,
 } from './app/shared'
 import { useAgentDrafts } from './app/useAgentDrafts'
+import { usePostThreadData } from './app/usePostThreadData'
 import type {
-  CommentPageState,
   FeedLoadState,
   FeedSurface,
-  PostDetailState,
   SearchLoadState,
   Surface,
   SurfaceLoadOptions,
@@ -102,11 +98,15 @@ function App() {
   )
   const [revealedCommentIds, setRevealedCommentIds] = useState<Set<string>>(() => new Set())
 
-  const [postDetailsById, setPostDetailsById] = useState<Record<string, PostDetailState>>({})
-  const [commentPagesByPostId, setCommentPagesByPostId] = useState<Record<string, CommentPageState>>({})
-  const [replyPagesByCommentId, setReplyPagesByCommentId] = useState<Record<string, CommentPageState>>(
-    {},
-  )
+  const {
+    postDetailsById,
+    commentPagesByPostId,
+    replyPagesByCommentId,
+    updateLoadedPost,
+    loadPostDetail,
+    loadPostComments,
+    loadCommentReplies,
+  } = usePostThreadData()
 
   const {
     createPostState,
@@ -216,152 +216,7 @@ function App() {
       },
     }))
 
-    setPostDetailsById((current) => {
-      const detail = current[postId]
-      if (!detail || !detail.post) {
-        return current
-      }
-
-      return {
-        ...current,
-        [postId]: {
-          ...detail,
-          post: updater(detail.post),
-        },
-      }
-    })
-  }
-
-  async function loadPostDetail(postId: string): Promise<void> {
-    setPostDetailsById((current) => ({
-      ...current,
-      [postId]: {
-        ...defaultPostDetailState(),
-        status: 'loading',
-      },
-    }))
-
-    const result = await fetchPost(postId)
-    setPostDetailsById((current) => ({
-      ...current,
-      [postId]: result.ok
-        ? {
-            status: 'ready',
-            post: result.data,
-            error: null,
-            requestId: result.requestId,
-          }
-        : {
-            status: 'error',
-            post: null,
-            error: mapReadPathError({
-              surface: 'post_detail',
-              code: result.code,
-              fallback: result.error,
-            }),
-            requestId: result.requestId,
-          },
-    }))
-  }
-
-  async function loadPostComments(postId: string, cursor?: string): Promise<void> {
-    setCommentPagesByPostId((current) => ({
-      ...current,
-      [postId]: {
-        ...(current[postId] ?? defaultCommentPageState()),
-        status: 'loading',
-      },
-    }))
-
-    const result = await fetchPostComments(postId, {
-      limit: 25,
-      cursor,
-    })
-
-    setCommentPagesByPostId((current) => {
-      const existing = current[postId] ?? defaultCommentPageState()
-      if (!result.ok) {
-        return {
-          ...current,
-          [postId]: {
-            ...existing,
-            status: 'error',
-            error: mapReadPathError({
-              surface: 'comments',
-              code: result.code,
-              fallback: result.error,
-            }),
-            requestId: result.requestId,
-          },
-        }
-      }
-
-      return {
-        ...current,
-        [postId]: {
-          status: 'ready',
-          error: null,
-          requestId: result.requestId,
-          page: cursor
-            ? {
-                items: [...existing.page.items, ...result.data.items],
-                hasMore: result.data.hasMore,
-                nextCursor: result.data.nextCursor,
-              }
-            : result.data,
-        },
-      }
-    })
-  }
-
-  async function loadCommentReplies(commentId: string, cursor?: string): Promise<void> {
-    setReplyPagesByCommentId((current) => ({
-      ...current,
-      [commentId]: {
-        ...(current[commentId] ?? defaultCommentPageState()),
-        status: 'loading',
-      },
-    }))
-
-    const result = await fetchCommentReplies(commentId, {
-      limit: 25,
-      cursor,
-    })
-
-    setReplyPagesByCommentId((current) => {
-      const existing = current[commentId] ?? defaultCommentPageState()
-      if (!result.ok) {
-        return {
-          ...current,
-          [commentId]: {
-            ...existing,
-            status: 'error',
-            error: mapReadPathError({
-              surface: 'replies',
-              code: result.code,
-              fallback: result.error,
-            }),
-            requestId: result.requestId,
-          },
-        }
-      }
-
-      return {
-        ...current,
-        [commentId]: {
-          status: 'ready',
-          error: null,
-          requestId: result.requestId,
-          page: cursor
-            ? {
-                items: [...existing.page.items, ...result.data.items],
-                hasMore: result.data.hasMore,
-                nextCursor: result.data.nextCursor,
-              }
-            : result.data,
-        },
-      }
-    })
+    updateLoadedPost(postId, updater)
   }
 
   async function loadFeedSurface(target: FeedSurface, options: SurfaceLoadOptions = {}): Promise<void> {
