@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   fetchExploreFeed,
   fetchFollowingFeed,
@@ -62,12 +62,60 @@ export function useSurfaceData(options: UseSurfaceDataOptions) {
     search: defaultFeedState(),
   })
   const [searchState, setSearchState] = useState<SearchLoadState>(() => defaultSearchState('posts'))
+  const feedStatesRef = useRef(feedStates)
+  const searchStateRef = useRef(searchState)
+  const selectedPostIdRef = useRef(selectedPostId)
+  const isPostDeletedRef = useRef(isPostDeleted)
+  const onSelectPostRef = useRef(onSelectPost)
+  const onEnsurePostLoadedRef = useRef(onEnsurePostLoaded)
+  const requestVersionRef = useRef<Record<Surface, number>>({
+    explore: 0,
+    following: 0,
+    hashtag: 0,
+    profile: 0,
+    search: 0,
+  })
+
+  useEffect(() => {
+    feedStatesRef.current = feedStates
+  }, [feedStates])
+
+  useEffect(() => {
+    searchStateRef.current = searchState
+  }, [searchState])
+
+  useEffect(() => {
+    selectedPostIdRef.current = selectedPostId
+  }, [selectedPostId])
+
+  useEffect(() => {
+    isPostDeletedRef.current = isPostDeleted
+  }, [isPostDeleted])
+
+  useEffect(() => {
+    onSelectPostRef.current = onSelectPost
+  }, [onSelectPost])
+
+  useEffect(() => {
+    onEnsurePostLoadedRef.current = onEnsurePostLoaded
+  }, [onEnsurePostLoaded])
+
+  function beginRequest(target: Surface): number {
+    const nextVersion = requestVersionRef.current[target] + 1
+    requestVersionRef.current[target] = nextVersion
+    return nextVersion
+  }
+
+  function isLatestRequest(target: Surface, requestVersion: number): boolean {
+    return requestVersionRef.current[target] === requestVersion
+  }
 
   async function loadFeedSurface(
     target: Exclude<Surface, 'search'>,
     loadOptions: SurfaceLoadOptions = {},
   ): Promise<void> {
     const append = loadOptions.append ?? false
+    const requestVersion = beginRequest(target)
 
     setFeedStates((current) => ({
       ...current,
@@ -90,6 +138,9 @@ export function useSurfaceData(options: UseSurfaceDataOptions) {
     } else if (target === 'hashtag') {
       const normalizedTag = hashtag.trim().replace(/^#/, '')
       if (!normalizedTag) {
+        if (!isLatestRequest(target, requestVersion)) {
+          return
+        }
         setFeedStates((current) => ({
           ...current,
           [target]: {
@@ -108,6 +159,9 @@ export function useSurfaceData(options: UseSurfaceDataOptions) {
     } else {
       const normalizedName = profileName.trim()
       if (!normalizedName) {
+        if (!isLatestRequest(target, requestVersion)) {
+          return
+        }
         setFeedStates((current) => ({
           ...current,
           [target]: {
@@ -123,6 +177,10 @@ export function useSurfaceData(options: UseSurfaceDataOptions) {
         limit: FEED_PAGE_LIMIT,
         cursor: loadOptions.cursor,
       })
+    }
+
+    if (!isLatestRequest(target, requestVersion)) {
+      return
     }
 
     if (!result.ok) {
@@ -142,7 +200,9 @@ export function useSurfaceData(options: UseSurfaceDataOptions) {
       return
     }
 
-    const nextPage = append ? mergeFeedPages(feedStates[target].page, result.data) : result.data
+    const nextPage = append
+      ? mergeFeedPages(feedStatesRef.current[target].page, result.data)
+      : result.data
 
     setFeedStates((current) => ({
       ...current,
@@ -154,13 +214,14 @@ export function useSurfaceData(options: UseSurfaceDataOptions) {
       },
     }))
 
-    const nextSelection = nextPage.posts.some((post) => post.id === selectedPostId)
-      ? selectedPostId
+    const currentSelectedPostId = selectedPostIdRef.current
+    const nextSelection = nextPage.posts.some((post) => post.id === currentSelectedPostId)
+      ? currentSelectedPostId
       : (nextPage.posts[0]?.id ?? null)
 
-    onSelectPost(nextSelection)
-    if (nextSelection && (!append || !selectedPostId)) {
-      await onEnsurePostLoaded(nextSelection)
+    onSelectPostRef.current(nextSelection)
+    if (nextSelection && (!append || !currentSelectedPostId)) {
+      await onEnsurePostLoadedRef.current(nextSelection)
     }
   }
 
@@ -168,7 +229,11 @@ export function useSurfaceData(options: UseSurfaceDataOptions) {
     const append = loadOptions.append ?? false
     const bucket = loadOptions.bucket
     const normalizedSearch = searchText.trim()
+    const requestVersion = beginRequest('search')
     if (!normalizedSearch) {
+      if (!isLatestRequest('search', requestVersion)) {
+        return
+      }
       setSearchState((current) => ({
         ...current,
         status: 'error',
@@ -193,6 +258,9 @@ export function useSurfaceData(options: UseSurfaceDataOptions) {
         code: 'validation_error',
         fallback: 'Search query must be at least 2 characters.',
       })
+      if (!isLatestRequest('search', requestVersion)) {
+        return
+      }
       setSearchState((current) => ({
         ...current,
         status: 'error',
@@ -219,10 +287,10 @@ export function useSurfaceData(options: UseSurfaceDataOptions) {
     }))
 
     const cursorByMode: Record<SearchType, string | null> = {
-      agents: searchState.page.cursors.agents,
-      hashtags: searchState.page.cursors.hashtags,
-      posts: searchState.page.cursors.posts,
-      all: searchState.page.cursors.posts,
+      agents: searchStateRef.current.page.cursors.agents,
+      hashtags: searchStateRef.current.page.cursors.hashtags,
+      posts: searchStateRef.current.page.cursors.posts,
+      all: searchStateRef.current.page.cursors.posts,
     }
     const singleCursor = append
       ? (loadOptions.cursor ?? cursorByMode[searchType] ?? undefined)
@@ -233,13 +301,13 @@ export function useSurfaceData(options: UseSurfaceDataOptions) {
         ? undefined
         : append && bucket
           ? {
-              [bucket]: searchState.page.cursors[bucket] ?? undefined,
+              [bucket]: searchStateRef.current.page.cursors[bucket] ?? undefined,
             }
           : append
             ? {
-                agents: searchState.page.cursors.agents ?? undefined,
-                hashtags: searchState.page.cursors.hashtags ?? undefined,
-                posts: searchState.page.cursors.posts ?? undefined,
+                agents: searchStateRef.current.page.cursors.agents ?? undefined,
+                hashtags: searchStateRef.current.page.cursors.hashtags ?? undefined,
+                posts: searchStateRef.current.page.cursors.posts ?? undefined,
               }
             : undefined
 
@@ -252,15 +320,20 @@ export function useSurfaceData(options: UseSurfaceDataOptions) {
       limits: SEARCH_ALL_LIMITS,
     })
 
+    if (!isLatestRequest('search', requestVersion)) {
+      return
+    }
+
     if (!result.ok) {
+      const message = mapReadPathError({
+        surface: 'search',
+        code: result.code,
+        fallback: result.error,
+      })
       setSearchState((current) => ({
         ...current,
         status: 'error',
-        error: mapReadPathError({
-          surface: 'search',
-          code: result.code,
-          fallback: result.error,
-        }),
+        error: message,
         requestId: result.requestId,
       }))
       setFeedStates((current) => ({
@@ -268,11 +341,7 @@ export function useSurfaceData(options: UseSurfaceDataOptions) {
         search: {
           ...current.search,
           status: 'error',
-          error: mapReadPathError({
-            surface: 'search',
-            code: result.code,
-            fallback: result.error,
-          }),
+          error: message,
           requestId: result.requestId,
         },
       }))
@@ -281,7 +350,7 @@ export function useSurfaceData(options: UseSurfaceDataOptions) {
 
     const nextPage = append
       ? mergeUnifiedSearchPage({
-          current: searchState.page,
+          current: searchStateRef.current.page,
           incoming: result.data,
           mode: searchType,
           bucket,
@@ -305,13 +374,14 @@ export function useSurfaceData(options: UseSurfaceDataOptions) {
       },
     }))
 
-    const searchablePosts = nextPage.posts.posts.filter((post) => !isPostDeleted(post.id))
-    const nextSelection = searchablePosts.some((post) => post.id === selectedPostId)
-      ? selectedPostId
+    const searchablePosts = nextPage.posts.posts.filter((post) => !isPostDeletedRef.current(post.id))
+    const currentSelectedPostId = selectedPostIdRef.current
+    const nextSelection = searchablePosts.some((post) => post.id === currentSelectedPostId)
+      ? currentSelectedPostId
       : (searchablePosts[0]?.id ?? null)
-    onSelectPost(nextSelection)
-    if (nextSelection && (!append || !selectedPostId)) {
-      await onEnsurePostLoaded(nextSelection)
+    onSelectPostRef.current(nextSelection)
+    if (nextSelection && (!append || !currentSelectedPostId)) {
+      await onEnsurePostLoadedRef.current(nextSelection)
     }
   }
 
@@ -325,12 +395,13 @@ export function useSurfaceData(options: UseSurfaceDataOptions) {
   }
 
   const resetSearchForType = (nextType: SearchType) => {
+    requestVersionRef.current.search += 1
     setSearchState(defaultSearchState(nextType))
     setFeedStates((current) => ({
       ...current,
       search: defaultFeedState(),
     }))
-    onSelectPost(null)
+    onSelectPostRef.current(null)
   }
 
   const updatePostAcrossSurfaces = (postId: string, updater: (post: UiPost) => UiPost): void => {
