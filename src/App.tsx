@@ -10,15 +10,12 @@ import {
   searchUnified,
 } from './api/adapters'
 import type {
-  ReportReason,
   SearchType,
   UiComment,
   UiPost,
   UiSearchCursorMap,
 } from './api/adapters'
 import {
-  DEFAULT_CREATE_POST_DRAFT,
-  DEFAULT_REPORT_DRAFT,
   EMPTY_FEED_PAGE,
   FEED_PAGE_LIMIT,
   REPORT_REASONS,
@@ -37,13 +34,12 @@ import {
   splitCsv,
   wasAgeGateAcknowledged,
 } from './app/shared'
+import { useAgentDrafts } from './app/useAgentDrafts'
 import type {
   CommentPageState,
-  CreatePostDraft,
   FeedLoadState,
   FeedSurface,
   PostDetailState,
-  ReportDraft,
   SearchLoadState,
   Surface,
   SurfaceLoadOptions,
@@ -71,11 +67,26 @@ function App() {
   const [profileName, setProfileName] = useState('')
   const [searchText, setSearchText] = useState('')
   const [searchType, setSearchType] = useState<SearchType>('posts')
-  const [createPostDraft, setCreatePostDraft] = useState<CreatePostDraft>(DEFAULT_CREATE_POST_DRAFT)
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null)
-  const [commentDraftByPostId, setCommentDraftByPostId] = useState<Record<string, string>>({})
-  const [replyParentByPostId, setReplyParentByPostId] = useState<Record<string, string>>({})
-  const [reportDraftByPostId, setReportDraftByPostId] = useState<Record<string, ReportDraft>>({})
+
+  const {
+    createPostDraft,
+    getFocusedCommentDraft,
+    getFocusedReplyParent,
+    getFocusedReportDraft,
+    resetCreatePostDraft,
+    updateCreateCaption,
+    updateCreateMediaIds,
+    updateCreateHashtags,
+    updateCreateAltText,
+    updateCreateSensitive,
+    updateCreateOwnerInfluenced,
+    setFocusedReplyParent,
+    setFocusedCommentDraft,
+    setFocusedReportReason,
+    setFocusedReportDetails,
+    resetFocusedReportDraft,
+  } = useAgentDrafts()
 
   const [feedStates, setFeedStates] = useState<Record<Surface, FeedLoadState>>({
     explore: defaultFeedState(),
@@ -151,11 +162,9 @@ function App() {
       ? focusedDetailState.post
       : focusedFeedPost
 
-  const focusedCommentDraft = focusedPost ? (commentDraftByPostId[focusedPost.id] ?? '') : ''
-  const focusedReplyParent = focusedPost ? (replyParentByPostId[focusedPost.id] ?? '') : ''
-  const focusedReportDraft = focusedPost
-    ? (reportDraftByPostId[focusedPost.id] ?? DEFAULT_REPORT_DRAFT)
-    : DEFAULT_REPORT_DRAFT
+  const focusedCommentDraft = getFocusedCommentDraft(focusedPost?.id ?? null)
+  const focusedReplyParent = getFocusedReplyParent(focusedPost?.id ?? null)
+  const focusedReportDraft = getFocusedReportDraft(focusedPost?.id ?? null)
   const focusedLiked = focusedPost
     ? resolveLikedState(focusedPost.id, focusedPost.viewerHasLiked)
     : false
@@ -728,51 +737,9 @@ function App() {
     )
 
     if (result.ok) {
-      setCreatePostDraft(DEFAULT_CREATE_POST_DRAFT)
+      resetCreatePostDraft()
       void loadSurface(surface)
     }
-  }
-
-  const handleCreateCaptionChange = (value: string) => {
-    setCreatePostDraft((current) => ({
-      ...current,
-      caption: value,
-    }))
-  }
-
-  const handleCreateMediaIdsChange = (value: string) => {
-    setCreatePostDraft((current) => ({
-      ...current,
-      mediaIds: value,
-    }))
-  }
-
-  const handleCreateHashtagsChange = (value: string) => {
-    setCreatePostDraft((current) => ({
-      ...current,
-      hashtags: value,
-    }))
-  }
-
-  const handleCreateAltTextChange = (value: string) => {
-    setCreatePostDraft((current) => ({
-      ...current,
-      altText: value,
-    }))
-  }
-
-  const handleCreateSensitiveChange = (value: boolean) => {
-    setCreatePostDraft((current) => ({
-      ...current,
-      isSensitive: value,
-    }))
-  }
-
-  const handleCreateOwnerInfluencedChange = (value: boolean) => {
-    setCreatePostDraft((current) => ({
-      ...current,
-      isOwnerInfluenced: value,
-    }))
   }
 
   const handleToggleLike = async () => {
@@ -805,10 +772,7 @@ function App() {
 
     const result = await submitComment(focusedPost.id, trimmedBody, apiKeyInput, parentCommentId)
     if (result.ok) {
-      setCommentDraftByPostId((current) => ({
-        ...current,
-        [focusedPost.id]: '',
-      }))
+      setFocusedCommentDraft(focusedPost.id, '')
       updatePostAcrossViews(focusedPost.id, (post) => ({
         ...post,
         commentCount: post.commentCount + 1,
@@ -841,10 +805,7 @@ function App() {
         isSensitive: result.data.postIsSensitive,
         reportScore: result.data.postReportScore,
       }))
-      setReportDraftByPostId((current) => ({
-        ...current,
-        [focusedPost.id]: DEFAULT_REPORT_DRAFT,
-      }))
+      resetFocusedReportDraft(focusedPost.id)
     }
   }
 
@@ -868,56 +829,6 @@ function App() {
     }
 
     void Promise.all([loadPostDetail(focusedPost.id), loadPostComments(focusedPost.id)])
-  }
-
-  const handleFocusedReplyParentChange = (value: string) => {
-    if (!focusedPost) {
-      return
-    }
-
-    setReplyParentByPostId((current) => ({
-      ...current,
-      [focusedPost.id]: value,
-    }))
-  }
-
-  const handleFocusedCommentDraftChange = (value: string) => {
-    if (!focusedPost) {
-      return
-    }
-
-    setCommentDraftByPostId((current) => ({
-      ...current,
-      [focusedPost.id]: value,
-    }))
-  }
-
-  const handleFocusedReportReasonChange = (value: ReportReason) => {
-    if (!focusedPost) {
-      return
-    }
-
-    setReportDraftByPostId((current) => ({
-      ...current,
-      [focusedPost.id]: {
-        ...focusedReportDraft,
-        reason: value,
-      },
-    }))
-  }
-
-  const handleFocusedReportDetailsChange = (value: string) => {
-    if (!focusedPost) {
-      return
-    }
-
-    setReportDraftByPostId((current) => ({
-      ...current,
-      [focusedPost.id]: {
-        ...focusedReportDraft,
-        details: value,
-      },
-    }))
   }
 
   const handleLoadMoreFocusedComments = (cursor: string) => {
@@ -1056,22 +967,26 @@ function App() {
           />
         }
         reportReasons={REPORT_REASONS}
-        onCreateCaptionChange={handleCreateCaptionChange}
-        onCreateMediaIdsChange={handleCreateMediaIdsChange}
-        onCreateHashtagsChange={handleCreateHashtagsChange}
-        onCreateAltTextChange={handleCreateAltTextChange}
-        onCreateSensitiveChange={handleCreateSensitiveChange}
-        onCreateOwnerInfluencedChange={handleCreateOwnerInfluencedChange}
+        onCreateCaptionChange={updateCreateCaption}
+        onCreateMediaIdsChange={updateCreateMediaIds}
+        onCreateHashtagsChange={updateCreateHashtags}
+        onCreateAltTextChange={updateCreateAltText}
+        onCreateSensitiveChange={updateCreateSensitive}
+        onCreateOwnerInfluencedChange={updateCreateOwnerInfluenced}
         onCreatePost={() => void handleCreatePost()}
         onToggleLike={() => void handleToggleLike()}
         onToggleFollow={() => void handleToggleFollow()}
         onDeletePost={() => void handleDeletePost()}
         onRefreshFocusedPost={handleRefreshFocusedPost}
-        onFocusedReplyParentChange={handleFocusedReplyParentChange}
-        onFocusedCommentDraftChange={handleFocusedCommentDraftChange}
+        onFocusedReplyParentChange={(value) => setFocusedReplyParent(focusedPost?.id ?? null, value)}
+        onFocusedCommentDraftChange={(value) => setFocusedCommentDraft(focusedPost?.id ?? null, value)}
         onSubmitComment={() => void handleSubmitComment()}
-        onFocusedReportReasonChange={handleFocusedReportReasonChange}
-        onFocusedReportDetailsChange={handleFocusedReportDetailsChange}
+        onFocusedReportReasonChange={(value) =>
+          setFocusedReportReason(focusedPost?.id ?? null, focusedReportDraft, value)
+        }
+        onFocusedReportDetailsChange={(value) =>
+          setFocusedReportDetails(focusedPost?.id ?? null, focusedReportDraft, value)
+        }
         onSubmitReport={() => void handleSubmitReport()}
       />
 
