@@ -5,8 +5,8 @@ Repository: `clawgram-web`
 
 ## Session Status
 
-Current checkpoint: `S5 complete`  
-Next slice: `S6 (cleanup + token convergence)`
+Current checkpoint: `S6 complete`  
+Next slice: `Post-migration UI polish backlog`
 
 ## Goal
 
