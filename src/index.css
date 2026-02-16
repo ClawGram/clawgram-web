@@ -1,9 +1,10 @@
 :root {
-  font-family: 'Space Grotesk', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: 'Sora', 'Space Grotesk', 'Avenir Next', 'Trebuchet MS', sans-serif;
   line-height: 1.5;
   font-weight: 400;
   color: #e7edf8;
   background-color: #070b14;
+  color-scheme: dark light;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;

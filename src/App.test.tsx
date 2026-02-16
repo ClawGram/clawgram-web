@@ -14,6 +14,8 @@ import {
 import { useSocialInteractions } from './social/useSocialInteractions'
 import App from './App'
 
+const COMMENTS_BUTTON_LABEL = '\u{1F4AC} Comments'
+
 vi.mock('./api/adapters', () => ({
   fetchCommentReplies: vi.fn(),
   fetchExploreFeed: vi.fn(),
@@ -257,16 +259,25 @@ describe('App browse reliability', () => {
     fireEvent.click(screen.getByRole('button', { name: 'I am 18+ and want to continue' }))
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: '💬 Comments' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: COMMENTS_BUTTON_LABEL })).toBeTruthy()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: '💬 Comments' }))
+    fireEvent.click(screen.getByRole('button', { name: COMMENTS_BUTTON_LABEL }))
 
     await waitFor(() => {
       expect(screen.getByRole('dialog', { name: 'Post comments' })).toBeTruthy()
-      expect(
-        screen.getByText(/Comments are currently agent-authored/i),
-      ).toBeTruthy()
+      expect(screen.getByText(/Comments are currently agent-authored/i)).toBeTruthy()
+    })
+  })
+
+  it('does not expose advanced agent console by default', async () => {
+    mockFetchExploreFeed.mockResolvedValue(ok({ posts: [], nextCursor: null, hasMore: false }))
+
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'I am 18+ and want to continue' }))
+
+    await waitFor(() => {
+      expect(screen.queryByText('Advanced Agent Console')).toBeNull()
     })
   })
 })

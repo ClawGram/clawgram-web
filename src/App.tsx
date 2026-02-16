@@ -38,6 +38,8 @@ import { useSocialInteractions } from './social/useSocialInteractions'
 import './App.css'
 
 const FEED_BACKGROUND_REFRESH_MS = 60_000
+// Keep advanced tooling hidden unless explicitly enabled in local dev.
+const AGENT_CONSOLE_ENV_FLAG = 'true'
 
 const SECTION_TO_SURFACE = {
   home: 'explore',
@@ -105,6 +107,8 @@ function App() {
   const [searchType, setSearchType] = useState<SearchType>('posts')
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null)
   const [isCommentsDrawerOpen, setIsCommentsDrawerOpen] = useState(false)
+  const isAgentConsoleEnabled =
+    import.meta.env.DEV && import.meta.env.VITE_ENABLE_AGENT_CONSOLE === AGENT_CONSOLE_ENV_FLAG
 
   const {
     createPostDraft,
@@ -715,7 +719,7 @@ function App() {
           }}
         />
 
-        {import.meta.env.DEV ? (
+        {isAgentConsoleEnabled ? (
           <AgentConsole
             createPostDraft={createPostDraft}
             createPostState={createPostState}

@@ -1375,3 +1375,206 @@ body {
   color: var(--cg-muted);
   font-size: 0.86rem;
 }
+
+:root {
+  --cg-page-glow-a: #12213d;
+  --cg-page-glow-b: #070b14;
+  --cg-page-glow-c: #050810;
+  --cg-surface-contrast: #0a1325;
+  --cg-ease-standard: 220ms ease;
+  --cg-shadow-soft: 0 16px 40px -30px rgba(0, 0, 0, 0.72);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --cg-bg: #f4f7fb;
+    --cg-surface: #ffffff;
+    --cg-surface-soft: #f8fbff;
+    --cg-border: #d7dfeb;
+    --cg-text: #101828;
+    --cg-muted: #475467;
+    --cg-accent: #ff7a1a;
+    --cg-accent-soft: #ffe7d3;
+    --cg-page-glow-a: #f9fbff;
+    --cg-page-glow-b: #f4f7fb;
+    --cg-page-glow-c: #eef3f9;
+    --cg-surface-contrast: #f2f6fc;
+    --cg-shadow-soft: 0 20px 40px -36px rgba(16, 24, 40, 0.38);
+  }
+}
+
+body {
+  font-family: 'Sora', 'Space Grotesk', 'Avenir Next', 'Trebuchet MS', sans-serif;
+  background: radial-gradient(
+    circle at top left,
+    var(--cg-page-glow-a) 0%,
+    var(--cg-page-glow-b) 45%,
+    var(--cg-page-glow-c) 100%
+  );
+  color: var(--cg-text);
+  transition: background var(--cg-ease-standard), color var(--cg-ease-standard);
+}
+
+button,
+input,
+textarea,
+select,
+.left-rail,
+.center-column,
+.right-rail,
+.feed-post,
+.right-rail-card,
+.shell-panel,
+.search-scaffold,
+.status-banner {
+  transition:
+    border-color var(--cg-ease-standard),
+    background var(--cg-ease-standard),
+    color var(--cg-ease-standard),
+    transform var(--cg-ease-standard),
+    box-shadow var(--cg-ease-standard);
+}
+
+.left-rail,
+.center-column,
+.right-rail {
+  box-shadow: var(--cg-shadow-soft);
+}
+
+.shell-panel,
+.right-rail-card,
+.feed-post,
+.comments-drawer,
+.status-banner {
+  box-shadow: var(--cg-shadow-soft);
+}
+
+.left-rail-button:hover,
+.feed-follow-button:hover,
+.feed-icon-button:hover,
+.right-rail-link:hover,
+.search-type-button:hover,
+.surface-button:hover,
+.pagination-button:hover,
+.select-post-button:hover {
+  transform: translateY(-1px);
+}
+
+.left-rail-button.is-orange {
+  color: #fff6ef;
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--cg-accent) 68%, var(--cg-border) 32%);
+}
+
+.left-rail-button.is-orange.is-active {
+  color: #ffffff;
+  box-shadow:
+    inset 0 0 0 1px var(--cg-accent),
+    0 8px 20px -16px color-mix(in oklab, var(--cg-accent) 70%, black 30%);
+}
+
+.feed-post {
+  border-color: color-mix(in oklab, var(--cg-border) 88%, black 12%);
+  animation: cg-rise-in 320ms ease both;
+}
+
+.feed-stream > .feed-post:nth-child(1) {
+  animation-delay: 40ms;
+}
+
+.feed-stream > .feed-post:nth-child(2) {
+  animation-delay: 80ms;
+}
+
+.feed-stream > .feed-post:nth-child(3) {
+  animation-delay: 120ms;
+}
+
+.feed-stream > .feed-post:nth-child(4) {
+  animation-delay: 160ms;
+}
+
+.feed-stream > .feed-post:nth-child(5) {
+  animation-delay: 200ms;
+}
+
+.feed-post:hover {
+  transform: translateY(-2px);
+}
+
+.feed-post-media {
+  background: linear-gradient(145deg, var(--cg-surface-contrast), color-mix(in oklab, var(--cg-surface) 78%, black 22%));
+}
+
+.right-rail-card {
+  animation: cg-rise-in 300ms ease both;
+}
+
+.right-rail-card:nth-child(1) {
+  animation-delay: 45ms;
+}
+
+.right-rail-card:nth-child(2) {
+  animation-delay: 90ms;
+}
+
+.right-rail-card:nth-child(3) {
+  animation-delay: 135ms;
+}
+
+.comments-drawer-backdrop {
+  animation: cg-fade-in 220ms ease both;
+}
+
+.comments-drawer {
+  animation: cg-slide-in 240ms ease both;
+}
+
+@keyframes cg-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes cg-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes cg-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (max-width: 860px) {
+  .feed-post {
+    animation-delay: 0ms;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

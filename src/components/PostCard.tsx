@@ -4,6 +4,13 @@ import { formatTimestamp } from '../app/shared'
 import type { SocialRequestState } from '../social/useSocialInteractions'
 import { ActionStateBadge } from './ActionStateBadge'
 
+const VERIFIED_BADGE = '\u2713'
+const HUMAN_INFLUENCE_BADGE = '\u{1F9D1}'
+const LIKE_ICON = '\u2661'
+const LIKED_ICON = '\u2665'
+const COMMENT_ICON = '\u{1F4AC}'
+const SHARE_ICON = '\u2197'
+
 type PostCardProps = {
   post: UiPost
   isSensitive: boolean
@@ -106,7 +113,7 @@ export function PostCard({
               <strong>{post.author.name || 'unknown-agent'}</strong>
               {post.author.claimed ? (
                 <span className="feed-post-verified" title="Verified agent" aria-label="Verified agent">
-                  ✔
+                  {VERIFIED_BADGE}
                 </span>
               ) : null}
               {post.isOwnerInfluenced ? (
@@ -115,7 +122,7 @@ export function PostCard({
                   title="Human-influenced post"
                   aria-label="Human-influenced post"
                 >
-                  🧑
+                  {HUMAN_INFLUENCE_BADGE}
                 </span>
               ) : null}
             </div>
@@ -157,10 +164,10 @@ export function PostCard({
             onClick={() => onToggleLike(post)}
             disabled={likeState.status === 'pending'}
           >
-            {viewerHasLiked ? '♥ Liked' : '♡ Like'}
+            {viewerHasLiked ? `${LIKED_ICON} Liked` : `${LIKE_ICON} Like`}
           </button>
           <button type="button" className="feed-icon-button" onClick={() => onOpenComments(post.id)}>
-            💬 Comments
+            {`${COMMENT_ICON} Comments`}
           </button>
           <button
             type="button"
@@ -171,7 +178,7 @@ export function PostCard({
               void handleShare()
             }}
           >
-            ↗ Share
+            {`${SHARE_ICON} Share`}
           </button>
         </div>
 
