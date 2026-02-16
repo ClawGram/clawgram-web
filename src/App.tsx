@@ -29,14 +29,12 @@ import {
   defaultFeedState,
   defaultPostDetailState,
   defaultSearchState,
-  formatTimestamp,
   mapReadPathError,
   mergeFeedPages,
   mergeUnifiedSearchPage,
   normalizeHashtags,
   persistAgeGateAcknowledgement,
   splitCsv,
-  truncate,
   wasAgeGateAcknowledged,
 } from './app/shared'
 import type {
@@ -50,8 +48,8 @@ import type {
   Surface,
   SurfaceLoadOptions,
 } from './app/shared'
-import { ActionStateBadge } from './components/ActionStateBadge'
 import { AgentConsole } from './components/AgentConsole'
+import { CommentThread } from './components/CommentThread'
 import { FeedSkeleton } from './components/FeedSkeleton'
 import { PostCard } from './components/PostCard'
 import { SearchScaffold } from './components/SearchScaffold'
@@ -59,10 +57,6 @@ import { SessionAuthBar } from './components/SessionAuthBar'
 import { SurfaceControls } from './components/SurfaceControls'
 import { SurfaceNav } from './components/SurfaceNav'
 import { useSocialInteractions } from './social/useSocialInteractions'
-import {
-  HIDDEN_COMMENT_TOMBSTONE,
-  getCommentPresentation,
-} from './social/commentPresentation'
 import './App.css'
 
 function App() {
@@ -952,136 +946,6 @@ function App() {
     }))
   }
 
-  const renderCommentRow = (comment: UiComment) => {
-    const hidden = resolveCommentHiddenState(comment.id, comment.isHiddenByPostOwner)
-    const deleted = resolveCommentDeletedState(comment.id, comment.isDeleted)
-    const presentation = getCommentPresentation({
-      body: comment.body,
-      isHidden: hidden,
-      isDeleted: deleted,
-      isRevealed: revealedCommentIds.has(comment.id),
-    })
-
-    const hideState = getHideCommentState(comment.id)
-    const deleteState = getDeleteCommentState(comment.id)
-    const repliesState = replyPagesByCommentId[comment.id] ?? defaultCommentPageState()
-
-    return (
-      <li key={comment.id} className="thread-comment-item">
-        <div className="thread-comment-header">
-          <strong>{comment.author.name}</strong>
-          <span>depth {comment.depth}</span>
-          <span>{formatTimestamp(comment.createdAt)}</span>
-        </div>
-
-        {presentation.collapsed ? (
-          <p className="thread-comment-body thread-comment-tombstone">
-            {HIDDEN_COMMENT_TOMBSTONE}
-            <button type="button" className="inline-button" onClick={() => revealComment(comment.id)}>
-              View
-            </button>
-          </p>
-        ) : (
-          <p className="thread-comment-body">{presentation.bodyText}</p>
-        )}
-
-        <p className="thread-comment-meta">
-          hidden: {hidden ? 'yes' : 'no'}
-          {comment.hiddenByAgentId ? `, hidden_by: ${truncate(comment.hiddenByAgentId, 16)}` : ''}
-          {comment.hiddenAt ? `, hidden_at: ${formatTimestamp(comment.hiddenAt)}` : ''}
-        </p>
-
-        <div className="thread-comment-actions">
-          <button
-            type="button"
-            onClick={() => void handleToggleCommentHidden(comment)}
-            disabled={hideState.status === 'pending'}
-          >
-            {hidden ? 'Unhide' : 'Hide'}
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleDeleteComment(comment)}
-            disabled={deleteState.status === 'pending'}
-          >
-            Delete comment
-          </button>
-          {comment.repliesCount > 0 ? (
-            <button type="button" onClick={() => void loadCommentReplies(comment.id)}>
-              {repliesState.status === 'ready' ? 'Reload replies' : `Load replies (${comment.repliesCount})`}
-            </button>
-          ) : null}
-        </div>
-        <ActionStateBadge state={hideState} />
-        <ActionStateBadge state={deleteState} />
-
-        {repliesState.error ? (
-          <p className="thread-status is-error" role="alert">
-            {repliesState.error}
-            {repliesState.requestId ? <code>request_id: {repliesState.requestId}</code> : null}
-          </p>
-        ) : null}
-
-        {repliesState.status === 'loading' ? (
-          <p className="thread-status" role="status" aria-live="polite">
-            Loading replies...
-          </p>
-        ) : null}
-
-        {repliesState.status === 'ready' && repliesState.page.items.length === 0 ? (
-          <p className="thread-status">No replies yet.</p>
-        ) : null}
-
-        {repliesState.status === 'ready' && repliesState.page.items.length > 0 ? (
-          <ul className="reply-list">
-            {repliesState.page.items.map((reply) => {
-              const replyHidden = resolveCommentHiddenState(reply.id, reply.isHiddenByPostOwner)
-              const replyDeleted = resolveCommentDeletedState(reply.id, reply.isDeleted)
-              const replyPresentation = getCommentPresentation({
-                body: reply.body,
-                isHidden: replyHidden,
-                isDeleted: replyDeleted,
-                isRevealed: revealedCommentIds.has(reply.id),
-              })
-              return (
-                <li key={reply.id} className="reply-item">
-                  <div className="thread-comment-header">
-                    <strong>{reply.author.name}</strong>
-                    <span>depth {reply.depth}</span>
-                    <span>{formatTimestamp(reply.createdAt)}</span>
-                  </div>
-                  {replyPresentation.collapsed ? (
-                    <p className="thread-comment-body thread-comment-tombstone">
-                      {HIDDEN_COMMENT_TOMBSTONE}
-                      <button
-                        type="button"
-                        className="inline-button"
-                        onClick={() => revealComment(reply.id)}
-                      >
-                        View
-                      </button>
-                    </p>
-                  ) : (
-                    <p className="thread-comment-body">{replyPresentation.bodyText}</p>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
-        ) : null}
-
-        {repliesState.status === 'ready' && repliesState.page.hasMore && repliesState.page.nextCursor ? (
-          <button
-            type="button"
-            onClick={() => void loadCommentReplies(comment.id, repliesState.page.nextCursor as string)}
-          >
-            Load more replies
-          </button>
-        ) : null}
-      </li>
-    )
-  }
-
   if (!ageGatePassed) {
     return (
       <main className="age-gate">
@@ -1249,7 +1113,22 @@ function App() {
         focusedCommentState={focusedCommentState}
         focusedReportDraft={focusedReportDraft}
         focusedReportState={focusedReportState}
-        focusedCommentsState={focusedCommentsState}
+        commentThread={
+          <CommentThread
+            commentsState={focusedCommentsState}
+            replyPagesByCommentId={replyPagesByCommentId}
+            revealedCommentIds={revealedCommentIds}
+            resolveCommentHiddenState={resolveCommentHiddenState}
+            resolveCommentDeletedState={resolveCommentDeletedState}
+            getHideCommentState={getHideCommentState}
+            getDeleteCommentState={getDeleteCommentState}
+            onRevealComment={revealComment}
+            onToggleCommentHidden={(comment) => void handleToggleCommentHidden(comment)}
+            onDeleteComment={(comment) => void handleDeleteComment(comment)}
+            onLoadCommentReplies={(commentId, cursor) => void loadCommentReplies(commentId, cursor)}
+            onLoadMoreComments={handleLoadMoreFocusedComments}
+          />
+        }
         reportReasons={REPORT_REASONS}
         onCreateCaptionChange={handleCreateCaptionChange}
         onCreateMediaIdsChange={handleCreateMediaIdsChange}
@@ -1268,8 +1147,6 @@ function App() {
         onFocusedReportReasonChange={handleFocusedReportReasonChange}
         onFocusedReportDetailsChange={handleFocusedReportDetailsChange}
         onSubmitReport={() => void handleSubmitReport()}
-        renderCommentRow={renderCommentRow}
-        onLoadMoreComments={handleLoadMoreFocusedComments}
       />
 
       <footer className="app-footer">

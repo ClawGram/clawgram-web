@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react'
-import type { ReportReason, UiComment, UiPost } from '../api/adapters'
+import type { ReportReason, UiPost } from '../api/adapters'
 import type {
-  CommentPageState,
   CreatePostDraft,
   PostDetailState,
   ReportDraft,
@@ -27,7 +26,7 @@ type AgentConsoleProps = {
   focusedCommentState: SocialRequestState
   focusedReportDraft: ReportDraft
   focusedReportState: SocialRequestState
-  focusedCommentsState: CommentPageState
+  commentThread: ReactNode
   reportReasons: ReportReason[]
   onCreateCaptionChange: (value: string) => void
   onCreateMediaIdsChange: (value: string) => void
@@ -46,8 +45,6 @@ type AgentConsoleProps = {
   onFocusedReportReasonChange: (value: ReportReason) => void
   onFocusedReportDetailsChange: (value: string) => void
   onSubmitReport: () => void
-  renderCommentRow: (comment: UiComment) => ReactNode
-  onLoadMoreComments: (cursor: string) => void
 }
 
 export function AgentConsole({
@@ -67,7 +64,7 @@ export function AgentConsole({
   focusedCommentState,
   focusedReportDraft,
   focusedReportState,
-  focusedCommentsState,
+  commentThread,
   reportReasons,
   onCreateCaptionChange,
   onCreateMediaIdsChange,
@@ -86,8 +83,6 @@ export function AgentConsole({
   onFocusedReportReasonChange,
   onFocusedReportDetailsChange,
   onSubmitReport,
-  renderCommentRow,
-  onLoadMoreComments,
 }: AgentConsoleProps) {
   return (
     <details id="agent-console" className="agent-console">
@@ -275,53 +270,7 @@ export function AgentConsole({
                   {focusedReportState.status === 'pending' ? 'Submitting...' : 'Submit report'}
                 </button>
                 <ActionStateBadge state={focusedReportState} />
-
-                <div
-                  className="comment-thread"
-                  aria-live="polite"
-                  aria-busy={focusedCommentsState.status === 'loading'}
-                >
-                  <h4>Top-level comments</h4>
-
-                  {focusedCommentsState.error ? (
-                    <p className="thread-status is-error" role="alert">
-                      {focusedCommentsState.error}
-                      {focusedCommentsState.requestId ? (
-                        <code>request_id: {focusedCommentsState.requestId}</code>
-                      ) : null}
-                    </p>
-                  ) : null}
-
-                  {focusedCommentsState.status === 'loading' ? (
-                    <p className="thread-status" role="status" aria-live="polite">
-                      Loading comments...
-                    </p>
-                  ) : null}
-
-                  {focusedCommentsState.status === 'ready' &&
-                  focusedCommentsState.page.items.length === 0 ? (
-                    <p className="thread-status">No comments yet.</p>
-                  ) : null}
-
-                  {focusedCommentsState.page.items.length > 0 ? (
-                    <ul className="thread-comment-list">
-                      {focusedCommentsState.page.items.map((comment) => renderCommentRow(comment))}
-                    </ul>
-                  ) : null}
-
-                  {focusedCommentsState.status === 'ready' &&
-                  focusedCommentsState.page.hasMore &&
-                  focusedCommentsState.page.nextCursor ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onLoadMoreComments(focusedCommentsState.page.nextCursor as string)
-                      }
-                    >
-                      Load more comments
-                    </button>
-                  ) : null}
-                </div>
+                {commentThread}
               </>
             ) : (
               <p className="selected-post-empty">
