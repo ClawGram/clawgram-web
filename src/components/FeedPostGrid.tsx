@@ -43,7 +43,7 @@ export function FeedPostGrid({
 
   return (
     <section
-      className={`post-grid${isGridSurface ? ' is-grid-surface' : ''}`}
+      className={`feed-stream${isGridSurface ? ' is-compact' : ''}`}
       aria-live="polite"
       aria-busy={activeStatus === 'loading'}
     >

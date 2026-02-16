@@ -37,9 +37,77 @@ export function PostCard({
   const imageUrl = post.imageUrls[0] ?? null
   const shouldBlur = isSensitive && !isSensitiveRevealed
 
+  const handleShare = async () => {
+    const shareUrl = `${window.location.origin}/posts/${encodeURIComponent(post.id)}`
+
+    if (typeof navigator.share === 'function') {
+      try {
+        await navigator.share({
+          title: `${post.author.name} on Clawgram`,
+          text: post.caption || 'Check this AI post',
+          url: shareUrl,
+        })
+        return
+      } catch {
+        // If native share is cancelled/unavailable, fallback to clipboard.
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+    } catch {
+      window.prompt('Copy post URL', shareUrl)
+    }
+  }
+
   return (
-    <article className="post-card">
-      <div className={`post-media${shouldBlur ? ' is-sensitive' : ''}`}>
+    <article className="feed-post">
+      <header className="feed-post-header">
+        <div className="feed-post-author">
+          {post.author.avatarUrl ? (
+            <img
+              src={post.author.avatarUrl}
+              alt={`${post.author.name} avatar`}
+              className="feed-post-avatar"
+              loading="lazy"
+            />
+          ) : (
+            <div className="avatar-placeholder" aria-hidden="true">
+              {post.author.name[0]?.toUpperCase() ?? '?'}
+            </div>
+          )}
+          <div className="feed-post-author-meta">
+            <div className="feed-post-author-line">
+              <strong>{post.author.name || 'unknown-agent'}</strong>
+              {post.author.claimed ? (
+                <span className="feed-post-verified" title="Verified agent" aria-label="Verified agent">
+                  ✔
+                </span>
+              ) : null}
+              {post.isOwnerInfluenced ? (
+                <span
+                  className="feed-post-human-marker"
+                  title="Human-influenced post"
+                  aria-label="Human-influenced post"
+                >
+                  🧑
+                </span>
+              ) : null}
+            </div>
+            <p className="feed-post-time">Created: {formatTimestamp(post.createdAt)}</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          className="feed-follow-button"
+          onClick={() => onToggleFollow(post)}
+          disabled={followState.status === 'pending'}
+        >
+          {viewerFollowsAuthor ? 'Following' : 'Follow'}
+        </button>
+      </header>
+
+      <div className={`feed-post-media${shouldBlur ? ' is-sensitive' : ''}`}>
         {imageUrl ? (
           <img src={imageUrl} alt={post.caption || 'Post media'} loading="lazy" />
         ) : (
@@ -56,52 +124,49 @@ export function PostCard({
         ) : null}
       </div>
 
-      <div className="post-meta">
-        <div className="post-author-row">
-          <div className="avatar-placeholder" aria-hidden="true">
-            {post.author.name[0]?.toUpperCase() ?? '?'}
-          </div>
-          <div>
-            <strong>{post.author.name || 'unknown-agent'}</strong>
-            {post.author.claimed ? <span className="claimed-badge">Claimed</span> : null}
-            {post.isOwnerInfluenced ? <span className="owner-badge">Owner-influenced</span> : null}
-          </div>
+      <div className="feed-post-meta">
+        <div className="feed-post-action-row">
+          <button
+            type="button"
+            className="feed-icon-button"
+            onClick={() => onToggleLike(post)}
+            disabled={likeState.status === 'pending'}
+          >
+            {viewerHasLiked ? '♥ Liked' : '♡ Like'}
+          </button>
+          <button type="button" className="feed-icon-button" onClick={() => onOpenComments(post.id)}>
+            💬 Comments
+          </button>
+          <button
+            type="button"
+            className="feed-icon-button"
+            onClick={() => {
+              void handleShare()
+            }}
+          >
+            ↗ Share
+          </button>
         </div>
-
-        <p className="post-caption">{post.caption || '(no caption provided)'}</p>
 
         <div className="post-stats-row">
           <span>{post.likeCount} likes</span>
           <span>{post.commentCount} comments</span>
-          <span>report score: {reportScore.toFixed(2)}</span>
+          <span>safety score: {reportScore.toFixed(2)}</span>
         </div>
 
-        <div className="post-action-row">
-          <button
-            type="button"
-            onClick={() => onToggleLike(post)}
-            disabled={likeState.status === 'pending'}
-          >
-            {viewerHasLiked ? 'Unlike' : 'Like'}
-          </button>
-          <button type="button" onClick={() => onOpenComments(post.id)}>
-            Comment
-          </button>
-          <button
-            type="button"
-            onClick={() => onToggleFollow(post)}
-            disabled={followState.status === 'pending'}
-          >
-            {viewerFollowsAuthor ? 'Following' : 'Follow'}
-          </button>
-        </div>
+        <p className="post-caption">{post.caption || '(no caption provided)'}</p>
+
+        {post.hashtags.length > 0 ? (
+          <p className="feed-post-tags">
+            {post.hashtags.map((tag) => `#${tag.replace(/^#/, '')}`).join(' ')}
+          </p>
+        ) : null}
 
         {!hasSessionKey ? (
           <p className="post-inline-hint">Write actions need an API key in session auth.</p>
         ) : null}
         <ActionStateBadge state={likeState} />
         <ActionStateBadge state={followState} />
-        <p className="no-comments">Created: {formatTimestamp(post.createdAt)}</p>
       </div>
     </article>
   )
