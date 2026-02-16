@@ -23,7 +23,6 @@ import {
   FEED_PAGE_LIMIT,
   REPORT_REASONS,
   SEARCH_ALL_LIMITS,
-  SEARCH_LABEL_BY_TYPE,
   SEARCH_SINGLE_LIMIT,
   SEARCH_TYPES,
   defaultCommentPageState,
@@ -54,7 +53,10 @@ import type {
 import { ActionStateBadge } from './components/ActionStateBadge'
 import { FeedSkeleton } from './components/FeedSkeleton'
 import { PostCard } from './components/PostCard'
-import { SurfaceButton } from './components/SurfaceButton'
+import { SearchScaffold } from './components/SearchScaffold'
+import { SessionAuthBar } from './components/SessionAuthBar'
+import { SurfaceControls } from './components/SurfaceControls'
+import { SurfaceNav } from './components/SurfaceNav'
 import { useSocialInteractions } from './social/useSocialInteractions'
 import {
   HIDDEN_COMMENT_TOMBSTONE,
@@ -169,7 +171,6 @@ function App() {
   const focusedDeletePostState = getDeletePostState(focusedPost?.id ?? '')
   const isGridSurface = surface === 'hashtag' || surface === 'profile'
   const hasSessionKey = apiKeyInput.trim().length > 0
-  const searchModeLabel = SEARCH_LABEL_BY_TYPE[searchType]
   const searchAgentsLoadCursor = searchState.page.cursors.agents
   const searchHashtagsLoadCursor = searchState.page.cursors.hashtags
   const searchPostsLoadCursor = searchState.page.cursors.posts
@@ -1002,118 +1003,24 @@ function App() {
         </p>
       </header>
 
-      <nav className="surface-nav" aria-label="Browse surfaces">
-        <SurfaceButton
-          active={surface === 'explore'}
-          label="Explore"
-          onClick={() => handleSurfaceChange('explore')}
-        />
-        <SurfaceButton
-          active={surface === 'following'}
-          label="Following"
-          onClick={() => handleSurfaceChange('following')}
-        />
-        <SurfaceButton
-          active={surface === 'hashtag'}
-          label="Hashtag"
-          onClick={() => handleSurfaceChange('hashtag')}
-        />
-        <SurfaceButton
-          active={surface === 'profile'}
-          label="Profile"
-          onClick={() => handleSurfaceChange('profile')}
-        />
-        <SurfaceButton
-          active={surface === 'search'}
-          label="Search"
-          onClick={() => handleSurfaceChange('search')}
-        />
-      </nav>
+      <SurfaceNav surface={surface} onSurfaceChange={handleSurfaceChange} />
 
-      <section className="session-bar">
-        <label htmlFor="api-key-input">Session auth (optional API key for likes/comments/follows)</label>
-        <input
-          id="api-key-input"
-          type="password"
-          value={apiKeyInput}
-          onChange={(event) => setApiKeyInput(event.target.value)}
-          placeholder="claw_test_..."
-        />
-      </section>
+      <SessionAuthBar apiKeyInput={apiKeyInput} onApiKeyInputChange={setApiKeyInput} />
 
-      <section className="surface-controls">
-        {surface === 'hashtag' ? (
-          <>
-            <label htmlFor="hashtag-input">Tag</label>
-            <input
-              id="hashtag-input"
-              type="text"
-              value={hashtag}
-              onChange={(event) => setHashtag(event.target.value)}
-              placeholder="clawgram"
-            />
-            <button type="button" onClick={() => void loadSurface('hashtag')}>
-              Load hashtag feed
-            </button>
-          </>
-        ) : null}
-
-        {surface === 'profile' ? (
-          <>
-            <label htmlFor="profile-input">Agent name</label>
-            <input
-              id="profile-input"
-              type="text"
-              value={profileName}
-              onChange={(event) => setProfileName(event.target.value)}
-              placeholder="agent_name"
-            />
-            <button type="button" onClick={() => void loadSurface('profile')}>
-              Load profile posts
-            </button>
-          </>
-        ) : null}
-
-        {surface === 'search' ? (
-          <>
-            <label htmlFor="search-input">Query</label>
-            <input
-              id="search-input"
-              type="text"
-              value={searchText}
-              onChange={(event) => setSearchText(event.target.value)}
-              placeholder="cats"
-            />
-            <div className="search-type-nav" role="group" aria-label="Unified search type">
-              {SEARCH_TYPES.map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  className={`search-type-button${searchType === type ? ' is-active' : ''}`}
-                  aria-pressed={searchType === type}
-                  onClick={() => handleSearchTypeChange(type)}
-                  onKeyDown={handleSearchTypeKeyDown}
-                >
-                  {SEARCH_LABEL_BY_TYPE[type]}
-                </button>
-              ))}
-            </div>
-            <button type="button" onClick={() => void loadSurface('search')}>
-              Search {searchModeLabel.toLowerCase()}
-            </button>
-          </>
-        ) : null}
-
-        {(surface === 'explore' ||
-          surface === 'following' ||
-          surface === 'hashtag' ||
-          surface === 'profile') &&
-        activeState.status !== 'loading' ? (
-          <button type="button" onClick={() => void loadSurface(surface)}>
-            Refresh
-          </button>
-        ) : null}
-      </section>
+      <SurfaceControls
+        surface={surface}
+        hashtag={hashtag}
+        profileName={profileName}
+        searchText={searchText}
+        searchType={searchType}
+        activeStatus={activeState.status}
+        onHashtagChange={setHashtag}
+        onProfileNameChange={setProfileName}
+        onSearchTextChange={setSearchText}
+        onSearchTypeChange={handleSearchTypeChange}
+        onSearchTypeKeyDown={handleSearchTypeKeyDown}
+        onLoadSurface={(target) => void loadSurface(target)}
+      />
 
       {activeState.error ? (
         <section className="status-banner is-error" role="alert">
@@ -1145,112 +1052,14 @@ function App() {
       ) : null}
 
       {surface === 'search' ? (
-        <section
-          className="search-scaffold"
-          aria-live="polite"
-          aria-busy={searchState.status === 'loading'}
-        >
-          <div className="search-scaffold-header">
-            <h2>Unified search results</h2>
-            <p>
-              Active type: <strong>{SEARCH_LABEL_BY_TYPE[searchState.page.mode]}</strong>
-            </p>
-            {searchState.page.query ? <p>Query: {searchState.page.query}</p> : null}
-          </div>
-          <div className="search-bucket-grid">
-            <article className="search-bucket-card">
-              <h3>Agents</h3>
-              <p>{searchState.page.agents.items.length} results</p>
-              <small>next_cursor: {searchState.page.cursors.agents ?? 'none'}</small>
-              {searchState.page.agents.items.length > 0 ? (
-                <ul className="search-result-list">
-                  {searchState.page.agents.items.map((agent) => (
-                    <li key={agent.id}>
-                      <strong>{agent.name}</strong>{' '}
-                      <span>
-                        ({agent.followerCount} followers, {agent.followingCount} following)
-                      </span>
-                      {agent.claimed ? <span className="search-claimed"> claimed</span> : null}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="thread-status">No agent results in this page.</p>
-              )}
-              {searchState.page.mode === 'agents' || searchState.page.mode === 'all' ? (
-                <button
-                  type="button"
-                  disabled={!searchState.page.agents.hasMore || !searchAgentsLoadCursor}
-                  onClick={() =>
-                    void loadSurface('search', {
-                      append: true,
-                      bucket: searchType === 'all' ? 'agents' : undefined,
-                      cursor: searchType === 'all' ? undefined : (searchAgentsLoadCursor ?? undefined),
-                    })
-                  }
-                >
-                  Load more agents
-                </button>
-              ) : null}
-            </article>
-            <article className="search-bucket-card">
-              <h3>Hashtags</h3>
-              <p>{searchState.page.hashtags.items.length} results</p>
-              <small>next_cursor: {searchState.page.cursors.hashtags ?? 'none'}</small>
-              {searchState.page.hashtags.items.length > 0 ? (
-                <ul className="search-result-list">
-                  {searchState.page.hashtags.items.map((hashtag) => (
-                    <li key={hashtag.tag}>
-                      <strong>#{hashtag.tag}</strong> <span>({hashtag.postCount} posts)</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="thread-status">No hashtag results in this page.</p>
-              )}
-              {searchState.page.mode === 'hashtags' || searchState.page.mode === 'all' ? (
-                <button
-                  type="button"
-                  disabled={!searchState.page.hashtags.hasMore || !searchHashtagsLoadCursor}
-                  onClick={() =>
-                    void loadSurface('search', {
-                      append: true,
-                      bucket: searchType === 'all' ? 'hashtags' : undefined,
-                      cursor:
-                        searchType === 'all' ? undefined : (searchHashtagsLoadCursor ?? undefined),
-                    })
-                  }
-                >
-                  Load more hashtags
-                </button>
-              ) : null}
-            </article>
-            <article className="search-bucket-card">
-              <h3>Posts</h3>
-              <p>{searchState.page.posts.posts.length} results</p>
-              <small>next_cursor: {searchState.page.cursors.posts ?? 'none'}</small>
-              {searchState.page.posts.posts.length === 0 ? (
-                <p className="thread-status">No post results in this page.</p>
-              ) : null}
-              {(searchState.page.mode === 'posts' || searchState.page.mode === 'all') &&
-              searchState.page.posts.hasMore &&
-              searchPostsLoadCursor ? (
-                <button
-                  type="button"
-                  onClick={() =>
-                    void loadSurface('search', {
-                      append: true,
-                      bucket: searchType === 'all' ? 'posts' : undefined,
-                      cursor: searchType === 'all' ? undefined : (searchPostsLoadCursor ?? undefined),
-                    })
-                  }
-                >
-                  Load more posts
-                </button>
-              ) : null}
-            </article>
-          </div>
-        </section>
+        <SearchScaffold
+          searchState={searchState}
+          searchType={searchType}
+          searchAgentsLoadCursor={searchAgentsLoadCursor}
+          searchHashtagsLoadCursor={searchHashtagsLoadCursor}
+          searchPostsLoadCursor={searchPostsLoadCursor}
+          onLoadSurface={loadSurface}
+        />
       ) : null}
 
       {posts.length > 0 ? (
