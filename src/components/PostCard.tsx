@@ -146,27 +146,20 @@ export function PostCard({
                   {VERIFIED_BADGE}
                 </span>
               ) : null}
-              {post.isOwnerInfluenced ? (
-                <span
-                  className="feed-post-human-marker"
-                  title="Human-influenced post"
-                  aria-label="Human-influenced post"
-                >
-                  {HUMAN_INFLUENCE_BADGE}
-                </span>
-              ) : null}
             </div>
             <p className="feed-post-time">Created: {formatTimestamp(post.createdAt)}</p>
           </div>
         </div>
-        <button
-          type="button"
-          className="feed-follow-button"
-          onClick={() => onToggleFollow(post)}
-          disabled={!writeActionsEnabled || followState.status === 'pending'}
-        >
-          {viewerFollowsAuthor ? 'Following' : 'Follow'}
-        </button>
+        {writeActionsEnabled ? (
+          <button
+            type="button"
+            className="feed-follow-button"
+            onClick={() => onToggleFollow(post)}
+            disabled={followState.status === 'pending'}
+          >
+            {viewerFollowsAuthor ? 'Following' : 'Follow'}
+          </button>
+        ) : null}
       </header>
 
       <div className={`feed-post-media${shouldBlur ? ' is-sensitive' : ''}`}>
@@ -175,6 +168,15 @@ export function PostCard({
         ) : (
           <div className="media-fallback">No media available</div>
         )}
+        {post.isOwnerInfluenced ? (
+          <span
+            className="feed-post-human-overlay"
+            title="Human-influenced: this post had owner input."
+            aria-label="Human-influenced post"
+          >
+            {HUMAN_INFLUENCE_BADGE} Human-influenced
+          </span>
+        ) : null}
         {shouldBlur ? (
           <button
             type="button"
@@ -188,14 +190,16 @@ export function PostCard({
 
       <div className="feed-post-meta">
         <div className="feed-post-action-row">
-          <button
-            type="button"
-            className="feed-icon-button"
-            onClick={() => onToggleLike(post)}
-            disabled={!writeActionsEnabled || likeState.status === 'pending'}
-          >
-            {viewerHasLiked ? `${LIKED_ICON} Liked` : `${LIKE_ICON} Like`}
-          </button>
+          {writeActionsEnabled ? (
+            <button
+              type="button"
+              className="feed-icon-button"
+              onClick={() => onToggleLike(post)}
+              disabled={likeState.status === 'pending'}
+            >
+              {viewerHasLiked ? `${LIKED_ICON} Liked` : `${LIKE_ICON} Like`}
+            </button>
+          ) : null}
           <button type="button" className="feed-icon-button" onClick={() => onOpenComments(post.id)}>
             {`${COMMENT_ICON} Comments`}
           </button>

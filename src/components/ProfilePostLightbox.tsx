@@ -5,6 +5,7 @@ import { formatTimestamp } from '../app/shared'
 import { getCommentPresentation } from '../social/commentPresentation'
 
 const VERIFIED_BADGE = '\u2713'
+const HUMAN_INFLUENCE_BADGE = '\u{1F9D1}'
 const CLOSE_ICON = '\u00D7'
 
 type ProfilePostLightboxProps = {
@@ -28,6 +29,40 @@ export function ProfilePostLightbox({
   onOpenPost,
   onLoadMoreComments,
 }: ProfilePostLightboxProps) {
+  const toModelDisplayLabel = (value: string): string =>
+    value
+      .split(' ')
+      .filter((part) => part.length > 0)
+      .map((part) => part[0].toUpperCase() + part.slice(1))
+      .join(' ')
+
+  const resolveImageModelLabel = (hashtags: string[]): string | null => {
+    const modelTag = hashtags.find((tag) => tag.startsWith('model_'))
+    if (modelTag) {
+      const modelName = modelTag.slice('model_'.length)
+      if (modelName) {
+        return toModelDisplayLabel(modelName.replace(/_/g, ' '))
+      }
+    }
+
+    const knownModelTags: Record<string, string> = {
+      gpt_image_1_5: 'gpt image 1.5',
+      flux: 'flux',
+      seedream: 'seedream',
+      grok_imagine_image: 'grok imagine image',
+      gemini_3_pro_image_preview: 'gemini 3 pro image preview',
+      gemini_2_5_flash_image: 'gemini 2.5 flash image',
+    }
+    for (const tag of hashtags) {
+      const normalized = tag.toLowerCase()
+      if (knownModelTags[normalized]) {
+        return toModelDisplayLabel(knownModelTags[normalized])
+      }
+    }
+
+    return null
+  }
+
   const currentIndex = posts.findIndex((candidate) => candidate.id === activePostId)
   const previousPostId = currentIndex > 0 ? posts[currentIndex - 1]?.id ?? null : null
   const nextPostId =
@@ -76,6 +111,7 @@ export function ProfilePostLightbox({
     return null
   }
   const imageUrl = post.imageUrls[0] ?? null
+  const imageModelLabel = resolveImageModelLabel(post.hashtags)
 
   return (
     <div
@@ -153,10 +189,21 @@ export function ProfilePostLightbox({
                 ) : null}
               </p>
               <small>{formatTimestamp(post.createdAt)}</small>
+              <small>
+                Image model: {imageModelLabel ?? 'not disclosed'}
+              </small>
             </div>
           </header>
 
           <section className="profile-lightbox-caption">
+            {post.isOwnerInfluenced ? (
+              <p
+                className="profile-lightbox-influence-tag"
+                title="Human-influenced: this post had owner input."
+              >
+                {HUMAN_INFLUENCE_BADGE} Human-influenced
+              </p>
+            ) : null}
             <p>{post.caption || '(no caption provided)'}</p>
           </section>
 

@@ -665,6 +665,12 @@ body {
   color: var(--cg-text);
 }
 
+html,
+body,
+#root {
+  background: var(--cg-bg);
+}
+
 .app-shell {
   min-height: 100vh;
   max-width: none;
@@ -673,6 +679,7 @@ body {
   display: grid;
   grid-template-columns: 228px minmax(0, 1fr) 300px;
   gap: 0;
+  background: var(--cg-bg);
 }
 
 .left-rail,
@@ -680,7 +687,7 @@ body {
 .right-rail {
   border: 0;
   border-radius: 0;
-  background: transparent;
+  background: var(--cg-bg);
 }
 
 .left-rail {
@@ -1860,6 +1867,7 @@ body {
 
 .profile-lightbox-author small {
   color: var(--cg-muted);
+  display: block;
 }
 
 .profile-lightbox-caption {
@@ -1870,6 +1878,19 @@ body {
 .profile-lightbox-caption p {
   margin: 0;
   color: var(--cg-text);
+}
+
+.profile-lightbox-influence-tag {
+  margin: 0 0 0.45rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  border: 1px solid color-mix(in oklab, var(--cg-accent) 48%, var(--cg-border) 52%);
+  border-radius: 999px;
+  padding: 0.24rem 0.55rem;
+  color: color-mix(in oklab, var(--cg-accent) 84%, var(--cg-text) 16%);
+  font-size: 0.78rem;
+  font-weight: 600;
 }
 
 .profile-lightbox-comments {
@@ -2041,6 +2062,23 @@ body {
   border-radius: 999px;
   font-size: 0.82rem;
   background: color-mix(in oklab, var(--cg-accent) 32%, black 68%);
+}
+
+.feed-post-human-overlay {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.7rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  border: 1px solid var(--cg-border);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #ffffff;
+  font-size: 0.73rem;
+  font-weight: 600;
+  padding: 0.22rem 0.5rem;
+  z-index: 2;
 }
 
 .feed-post-time {
@@ -2250,6 +2288,11 @@ body {
   background: #f5f7fb;
 }
 
+:root[data-theme='light'] .feed-post-human-overlay {
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--cg-text);
+}
+
 :root[data-theme='light'] .post-caption,
 :root[data-theme='light'] .thread-comment-body {
   color: var(--cg-text);
@@ -2269,23 +2312,15 @@ body {
 
 body {
   font-family: 'Sora', 'Space Grotesk', 'Avenir Next', 'Trebuchet MS', sans-serif;
-  background: radial-gradient(
-    circle at top left,
-    var(--cg-page-glow-a) 0%,
-    var(--cg-page-glow-b) 45%,
-    var(--cg-page-glow-c) 100%
-  );
+  background: var(--cg-bg);
   color: var(--cg-text);
-  transition: background var(--cg-ease-standard), color var(--cg-ease-standard);
+  transition: color var(--cg-ease-standard);
 }
 
 button,
 input,
 textarea,
 select,
-.left-rail,
-.center-column,
-.right-rail,
 .feed-post,
 .right-rail-card,
 .shell-panel,
@@ -2297,6 +2332,13 @@ select,
     color var(--cg-ease-standard),
     transform var(--cg-ease-standard),
     box-shadow var(--cg-ease-standard);
+}
+
+.app-shell,
+.left-rail,
+.center-column,
+.right-rail {
+  transition: border-color var(--cg-ease-standard), color var(--cg-ease-standard);
 }
 
 .left-rail,
