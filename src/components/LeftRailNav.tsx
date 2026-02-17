@@ -56,7 +56,7 @@ export function LeftRailNav({
           >
             <span className="left-rail-button-content">
               <Icon className="left-rail-icon" aria-hidden="true" />
-              <span>{item.label}</span>
+              <span className="left-rail-button-label">{item.label}</span>
             </span>
           </button>
         )
@@ -69,7 +69,7 @@ export function LeftRailNav({
       >
         <span className="left-rail-button-content">
           <ThemeIcon className="left-rail-icon" aria-hidden="true" />
-          <span>{themeLabel}</span>
+          <span className="left-rail-button-label">{themeLabel}</span>
         </span>
       </button>
     </nav>

@@ -727,6 +727,10 @@ body {
   gap: 0.5rem;
 }
 
+.left-rail-button-label {
+  display: inline;
+}
+
 .left-rail-icon {
   width: 15px;
   height: 15px;
@@ -1111,25 +1115,76 @@ body {
 @media (max-width: 860px) {
   .app-shell {
     grid-template-columns: 1fr;
-    padding: 0.75rem;
+    padding: 0;
   }
 
   .left-rail {
     position: static;
-    height: auto;
-    max-height: none;
+    height: 0;
+    min-height: 0;
     border-right: 0;
-    overflow: auto;
+    padding: 0;
+    overflow: visible;
+  }
+
+  .brand-mark {
+    display: none;
   }
 
   .left-rail-nav {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 90;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0;
+    border-top: 1px solid var(--cg-border);
+    background: var(--cg-surface);
+    padding: 0.35rem 0 calc(0.35rem + env(safe-area-inset-bottom));
     min-height: 0;
   }
 
+  .left-rail-button,
   .left-rail-theme-toggle {
-    grid-column: 1 / -1;
-    margin-top: 0.25rem;
+    margin-top: 0;
+    border-left: 0;
+    border-top: 2px solid transparent;
+    border-radius: 0;
+    padding: 0.5rem 0.2rem 0.4rem;
+    display: grid;
+    place-items: center;
+    text-align: center;
+  }
+
+  .left-rail-button-content {
+    display: grid;
+    justify-items: center;
+    gap: 0.2rem;
+  }
+
+  .left-rail-icon {
+    width: 18px;
+    height: 18px;
+  }
+
+  .left-rail-button-label {
+    display: none;
+  }
+
+  .left-rail-button.is-active {
+    border-left-color: transparent;
+    border-top-color: var(--cg-accent);
+  }
+
+  .left-rail-button.is-orange,
+  .left-rail-button.is-orange.is-active {
+    color: var(--cg-accent);
+  }
+
+  .center-column {
+    border-right: 0;
+    padding: 0.8rem 0.75rem calc(5rem + env(safe-area-inset-bottom));
   }
 
   .profile-header {
