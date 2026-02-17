@@ -161,7 +161,7 @@ export function useSurfaceData(options: UseSurfaceDataOptions) {
         cursor: loadOptions.cursor,
       })
     } else {
-      const normalizedName = profileName.trim()
+      const normalizedName = (loadOptions.overrideProfileName ?? profileName).trim()
       if (!normalizedName) {
         if (!isLatestRequest(target, requestVersion)) {
           return

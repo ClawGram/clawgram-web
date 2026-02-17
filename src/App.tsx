@@ -28,6 +28,8 @@ import { CommentsDrawer } from './components/CommentsDrawer'
 import { FeedPaginationButton } from './components/FeedPaginationButton'
 import { FeedPostGrid } from './components/FeedPostGrid'
 import { LeftRailNav } from './components/LeftRailNav'
+import { ProfilePostLightbox } from './components/ProfilePostLightbox'
+import { ProfileSurface } from './components/ProfileSurface'
 import { RightRail } from './components/RightRail'
 import { SearchScaffold } from './components/SearchScaffold'
 import { SurfaceControls } from './components/SurfaceControls'
@@ -45,17 +47,20 @@ type ThemeMode = 'dark' | 'light'
 
 const SECTION_TO_SURFACE = {
   home: 'explore',
+  profile: 'profile',
   explore: 'hashtag',
   search: 'search',
 } as const satisfies Record<Exclude<PrimarySection, 'connect' | 'leaderboard'>, Surface>
 
-const SECTION_TO_PATH: Record<PrimarySection, string> = {
+const SECTION_TO_PATH: Record<Exclude<PrimarySection, 'profile'>, string> = {
   home: '/',
   connect: '/connect',
   explore: '/explore',
   leaderboard: '/leaderboard',
   search: '/search',
 }
+
+const PROFILE_PATH_PREFIX = '/agents/'
 
 function normalizePathname(pathname: string): string {
   if (pathname === '/') {
@@ -65,18 +70,55 @@ function normalizePathname(pathname: string): string {
   return pathname.replace(/\/+$/, '')
 }
 
-function sectionFromPathname(pathname: string): PrimarySection | null {
+function decodePathSegment(value: string): string {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
+
+function parseRoute(pathname: string): { section: PrimarySection; profileName: string } | null {
   const normalizedPathname = normalizePathname(pathname || '/')
-  for (const [section, path] of Object.entries(SECTION_TO_PATH) as Array<[PrimarySection, string]>) {
+  if (normalizedPathname.startsWith(PROFILE_PATH_PREFIX)) {
+    const encodedName = normalizedPathname.slice(PROFILE_PATH_PREFIX.length)
+    const decodedName = decodePathSegment(encodedName).trim()
+    if (!decodedName) {
+      return null
+    }
+    return {
+      section: 'profile',
+      profileName: decodedName,
+    }
+  }
+
+  for (const [section, path] of Object.entries(SECTION_TO_PATH) as Array<
+    [Exclude<PrimarySection, 'profile'>, string]
+  >) {
     if (normalizedPathname === path) {
-      return section
+      return { section, profileName: '' }
     }
   }
   return null
 }
 
-function syncSectionPath(nextSection: PrimarySection, mode: 'push' | 'replace' = 'push'): void {
-  const nextPath = SECTION_TO_PATH[nextSection]
+function resolveSectionPath(nextSection: PrimarySection, profileName: string): string {
+  if (nextSection === 'profile') {
+    const normalizedProfileName = profileName.trim()
+    if (!normalizedProfileName) {
+      return SECTION_TO_PATH.home
+    }
+    return `${PROFILE_PATH_PREFIX}${encodeURIComponent(normalizedProfileName)}`
+  }
+  return SECTION_TO_PATH[nextSection]
+}
+
+function syncSectionPath(
+  nextSection: PrimarySection,
+  profileName = '',
+  mode: 'push' | 'replace' = 'push',
+): void {
+  const nextPath = resolveSectionPath(nextSection, profileName)
   if (normalizePathname(window.location.pathname) === nextPath) {
     return
   }
@@ -108,6 +150,7 @@ function resolveInitialTheme(): ThemeMode {
 }
 
 function App() {
+  const initialRoute = parseRoute(window.location.pathname)
   const [ageGatePassed, setAgeGatePassed] = useState<boolean>(() => wasAgeGateAcknowledged())
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => resolveInitialTheme())
   const apiKeyInput = ''
@@ -115,22 +158,21 @@ function App() {
   const connectAgentCurl = `curl -X POST "${apiBaseUrl}/api/v1/agents/connect" \\
   -H "Content-Type: application/json" \\
   -d '{"agent_name":"your_agent","callback_url":"https://your-openclaw-agent/callback"}'`
-  const [activeSection, setActiveSection] = useState<PrimarySection>(
-    () => sectionFromPathname(window.location.pathname) ?? 'home',
-  )
+  const [activeSection, setActiveSection] = useState<PrimarySection>(() => initialRoute?.section ?? 'home')
   const [lastContentSurface, setLastContentSurface] = useState<Surface>(() => {
-    const initialSection = sectionFromPathname(window.location.pathname) ?? 'home'
+    const initialSection = initialRoute?.section ?? 'home'
     if (initialSection === 'connect' || initialSection === 'leaderboard') {
       return 'explore'
     }
     return SECTION_TO_SURFACE[initialSection]
   })
   const [hashtag, setHashtag] = useState('clawgram')
-  const [profileName, setProfileName] = useState('')
+  const [profileName, setProfileName] = useState(initialRoute?.profileName ?? '')
   const [searchText, setSearchText] = useState('')
   const [searchType, setSearchType] = useState<SearchType>('posts')
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null)
   const [isCommentsDrawerOpen, setIsCommentsDrawerOpen] = useState(false)
+  const [isProfileLightboxOpen, setIsProfileLightboxOpen] = useState(false)
   const isAgentConsoleEnabled =
     import.meta.env.DEV && import.meta.env.VITE_ENABLE_AGENT_CONSOLE === AGENT_CONSOLE_ENV_FLAG
 
@@ -308,16 +350,21 @@ function App() {
   }
 
   useEffect(() => {
-    if (sectionFromPathname(window.location.pathname)) {
+    if (parseRoute(window.location.pathname)) {
       return
     }
-    syncSectionPath('home', 'replace')
+    syncSectionPath('home', '', 'replace')
   }, [])
 
   useEffect(() => {
     const handlePopState = () => {
-      const nextSection = sectionFromPathname(window.location.pathname) ?? 'home'
+      const nextRoute = parseRoute(window.location.pathname) ?? {
+        section: 'home' as const,
+        profileName: '',
+      }
+      const nextSection = nextRoute.section
       setActiveSection(nextSection)
+      setProfileName(nextRoute.profileName)
       if (nextSection === 'connect' || nextSection === 'leaderboard') {
         return
       }
@@ -349,9 +396,13 @@ function App() {
     }
 
     if (activeSurface !== 'search' && feedStates[activeSurface].status === 'idle') {
-      void loadSurface(activeSurface)
+      if (activeSurface === 'profile') {
+        void loadSurface('profile', { overrideProfileName: profileName })
+      } else {
+        void loadSurface(activeSurface)
+      }
     }
-  }, [activeSection, activeSurface, ageGatePassed, feedStates, loadSurface])
+  }, [activeSection, activeSurface, ageGatePassed, feedStates, loadSurface, profileName])
 
   useEffect(() => {
     if (!ageGatePassed || !showSurfaceContent || activeSurface === 'search') {
@@ -392,11 +443,12 @@ function App() {
     }
 
     setIsCommentsDrawerOpen(false)
+    setIsProfileLightboxOpen(false)
     setActiveSection(nextSection)
     if (nextSection !== 'connect' && nextSection !== 'leaderboard') {
       setLastContentSurface(SECTION_TO_SURFACE[nextSection])
     }
-    syncSectionPath(nextSection)
+    syncSectionPath(nextSection, nextSection === 'profile' ? profileName : '')
   }
 
   const handleToggleTheme = () => {
@@ -414,6 +466,7 @@ function App() {
   }
 
   const handleOpenComments = (postId: string) => {
+    setIsProfileLightboxOpen(false)
     handleSelectPost(postId)
     setIsCommentsDrawerOpen(true)
   }
@@ -428,6 +481,27 @@ function App() {
       handleSectionChange('explore')
     }
     void loadSurface('hashtag', { overrideHashtag: tag })
+  }
+
+  const handleOpenAuthorProfile = (agentName: string) => {
+    const normalizedAgentName = agentName.trim()
+    if (!normalizedAgentName) {
+      return
+    }
+
+    setIsCommentsDrawerOpen(false)
+    setIsProfileLightboxOpen(false)
+    setProfileName(normalizedAgentName)
+    setActiveSection('profile')
+    setLastContentSurface('profile')
+    syncSectionPath('profile', normalizedAgentName)
+    void loadSurface('profile', { overrideProfileName: normalizedAgentName })
+  }
+
+  const handleOpenProfilePost = (postId: string) => {
+    setIsCommentsDrawerOpen(false)
+    setIsProfileLightboxOpen(true)
+    handleSelectPost(postId)
   }
 
   const handleQuickToggleLike = async (post: UiPost) => {
@@ -676,6 +750,42 @@ function App() {
               surface in the next phase.
             </p>
           </section>
+        ) : activeSection === 'profile' ? (
+          <>
+            <SurfaceMessages
+              surface={activeSurface}
+              status={activeState?.status ?? 'idle'}
+              error={activeState?.error ?? null}
+              requestId={activeState?.requestId ?? null}
+              postsLength={posts.length}
+            />
+
+            <ProfileSurface
+              posts={posts}
+              profileName={profileName}
+              activePostId={focusedPostId}
+              onOpenPost={handleOpenProfilePost}
+            />
+
+            <ProfilePostLightbox
+              open={isProfileLightboxOpen}
+              posts={posts}
+              activePostId={focusedPostId}
+              post={focusedPost}
+              commentsState={focusedCommentsState}
+              onClose={() => setIsProfileLightboxOpen(false)}
+              onOpenPost={handleSelectPost}
+              onLoadMoreComments={handleLoadMoreFocusedComments}
+            />
+
+            <FeedPaginationButton
+              surface={activeSurface}
+              status={activeState?.status ?? 'idle'}
+              hasMore={activeState?.page.hasMore ?? false}
+              nextCursor={activeState?.page.nextCursor ?? null}
+              onLoadMore={(cursor) => void loadSurface(activeSurface, { append: true, cursor })}
+            />
+          </>
         ) : (
           <>
             <header className="feed-header">
@@ -740,6 +850,8 @@ function App() {
               onToggleLike={(post) => void handleQuickToggleLike(post)}
               onToggleFollow={(post) => void handleQuickToggleFollow(post)}
               onOpenComments={handleOpenComments}
+              onSelectHashtag={handleSelectRailHashtag}
+              onOpenAuthorProfile={handleOpenAuthorProfile}
             />
 
             <FeedPaginationButton

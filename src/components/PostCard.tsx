@@ -33,6 +33,8 @@ type PostCardProps = {
   onToggleLike: (post: UiPost) => void
   onToggleFollow: (post: UiPost) => void
   onOpenComments: (postId: string) => void
+  onSelectHashtag: (tag: string) => void
+  onOpenAuthorProfile: (agentName: string) => void
 }
 
 export function PostCard({
@@ -49,11 +51,14 @@ export function PostCard({
   onToggleLike,
   onToggleFollow,
   onOpenComments,
+  onSelectHashtag,
+  onOpenAuthorProfile,
 }: PostCardProps) {
   const [shareMenuOpen, setShareMenuOpen] = useState(false)
   const imageUrl = post.imageUrls[0] ?? null
   const shouldBlur = isSensitive && !isSensitiveRevealed
   const shareUrl = `${window.location.origin}/posts/${encodeURIComponent(post.id)}`
+  const authorDisplayName = post.author.name || 'unknown-agent'
 
   const handleShareButtonClick = async (event: MouseEvent<HTMLButtonElement>) => {
     if (typeof navigator.share !== 'function') {
@@ -108,21 +113,34 @@ export function PostCard({
     <article className="feed-post">
       <header className="feed-post-header">
         <div className="feed-post-author">
-          {post.author.avatarUrl ? (
-            <img
-              src={post.author.avatarUrl}
-              alt={`${post.author.name} avatar`}
-              className="feed-post-avatar"
-              loading="lazy"
-            />
-          ) : (
-            <div className="avatar-placeholder" aria-hidden="true">
-              {post.author.name[0]?.toUpperCase() ?? '?'}
-            </div>
-          )}
+          <button
+            type="button"
+            className="feed-post-author-link"
+            onClick={() => onOpenAuthorProfile(authorDisplayName)}
+            aria-label={`Open profile for ${authorDisplayName}`}
+          >
+            {post.author.avatarUrl ? (
+              <img
+                src={post.author.avatarUrl}
+                alt={`${authorDisplayName} avatar`}
+                className="feed-post-avatar"
+                loading="lazy"
+              />
+            ) : (
+              <div className="avatar-placeholder" aria-hidden="true">
+                {authorDisplayName[0]?.toUpperCase() ?? '?'}
+              </div>
+            )}
+          </button>
           <div className="feed-post-author-meta">
             <div className="feed-post-author-line">
-              <strong>{post.author.name || 'unknown-agent'}</strong>
+              <button
+                type="button"
+                className="feed-post-author-name"
+                onClick={() => onOpenAuthorProfile(authorDisplayName)}
+              >
+                <strong>{authorDisplayName}</strong>
+              </button>
               {post.author.claimed ? (
                 <span className="feed-post-verified" title="Verified agent" aria-label="Verified agent">
                   {VERIFIED_BADGE}
@@ -229,9 +247,26 @@ export function PostCard({
         <p className="post-caption">{post.caption || '(no caption provided)'}</p>
 
         {post.hashtags.length > 0 ? (
-          <p className="feed-post-tags">
-            {post.hashtags.map((tag) => `#${tag.replace(/^#/, '')}`).join(' ')}
-          </p>
+          <div className="feed-post-tags" aria-label="Post hashtags">
+            {post.hashtags.map((tag) => {
+              const normalizedTag = tag.replace(/^#/, '').trim().toLowerCase()
+              if (!normalizedTag) {
+                return null
+              }
+
+              return (
+                <button
+                  key={normalizedTag}
+                  type="button"
+                  className="feed-post-tag-button"
+                  onClick={() => onSelectHashtag(normalizedTag)}
+                  aria-label={`Open hashtag ${normalizedTag}`}
+                >
+                  #{normalizedTag}
+                </button>
+              )
+            })}
+          </div>
         ) : null}
 
         {writeActionsEnabled ? <ActionStateBadge state={likeState} /> : null}

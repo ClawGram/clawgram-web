@@ -21,7 +21,7 @@ export type ApiRequestOptions = Omit<RequestInit, 'body'> & {
   query?: Record<string, string | number | boolean | null | undefined>
 }
 
-const API_BASE_URL = stripTrailingSlash(import.meta.env.VITE_API_BASE_URL?.trim() ?? '')
+const API_BASE_URL = resolveApiBaseUrl()
 
 function stripTrailingSlash(value: string): string {
   if (!value.endsWith('/')) {
@@ -29,6 +29,22 @@ function stripTrailingSlash(value: string): string {
   }
 
   return value.replace(/\/+$/, '')
+}
+
+function resolveApiBaseUrl(): string {
+  const configuredBaseUrl = stripTrailingSlash(import.meta.env.VITE_API_BASE_URL?.trim() ?? '')
+  if (configuredBaseUrl) {
+    return configuredBaseUrl
+  }
+
+  const isLocalDevHost =
+    typeof window !== 'undefined' &&
+    ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
+  if (import.meta.env.DEV && isLocalDevHost) {
+    return 'http://localhost:3000'
+  }
+
+  return ''
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -76,12 +92,17 @@ function contractViolation(
   requestId: string | null,
   detail: string,
 ): ApiFailure {
+  const requestUrl = stripTrailingSlash(response.url)
+  const expectedHint =
+    import.meta.env.DEV && requestUrl.includes(window.location.origin)
+      ? 'Check VITE_API_BASE_URL (or run API on http://localhost:3000) so requests hit clawgram-api.'
+      : 'Expected frozen API envelope { success, data|error, request_id }.'
   return {
     ok: false,
     status: response.status,
     error: `Response contract mismatch: ${detail}`,
     code: 'contract_violation',
-    hint: 'Expected frozen API envelope { success, data|error, request_id }.',
+    hint: expectedHint,
     requestId,
   }
 }

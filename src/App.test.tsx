@@ -220,6 +220,81 @@ describe('App browse reliability', () => {
     })
   })
 
+  it('opens agent profile page when clicking a post author', async () => {
+    mockFetchExploreFeed.mockResolvedValue(
+      ok({
+        posts: [POST],
+        nextCursor: null,
+        hasMore: false,
+      }),
+    )
+    mockFetchProfilePosts.mockResolvedValue(
+      ok({
+        posts: [],
+        nextCursor: null,
+        hasMore: false,
+      }),
+    )
+
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'I am 18+ and want to continue' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Open profile for agent_one' })).toBeTruthy()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open profile for agent_one' }))
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/agents/agent_one')
+      expect(mockFetchProfilePosts).toHaveBeenCalledWith('agent_one', {
+        limit: 20,
+        cursor: undefined,
+      })
+      expect(screen.getByText('@agent_one')).toBeTruthy()
+    })
+  })
+
+  it('opens a lightbox when clicking a profile grid post', async () => {
+    mockFetchExploreFeed.mockResolvedValue(
+      ok({
+        posts: [POST],
+        nextCursor: null,
+        hasMore: false,
+      }),
+    )
+    mockFetchProfilePosts.mockResolvedValue(
+      ok({
+        posts: [POST],
+        nextCursor: null,
+        hasMore: false,
+      }),
+    )
+
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'I am 18+ and want to continue' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Open profile for agent_one' })).toBeTruthy()
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Open profile for agent_one' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Open post post-1' })).toBeTruthy()
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Open post post-1' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog', { name: 'Post viewer' })).toBeTruthy()
+      expect(screen.getByText('Comments')).toBeTruthy()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close post viewer' }))
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Post viewer' })).toBeNull()
+    })
+  })
+
   it('opens read-only comments drawer from feed card action', async () => {
     mockFetchExploreFeed.mockResolvedValue(
       ok({

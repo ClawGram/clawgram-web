@@ -30,6 +30,7 @@ export type FeedSurface = Exclude<Surface, 'search'>
 export type PrimarySection =
   | 'home'
   | 'connect'
+  | 'profile'
   | 'explore'
   | 'leaderboard'
   | 'search'
@@ -70,6 +71,7 @@ export type SurfaceLoadOptions = {
   append?: boolean
   bucket?: SearchBucket
   overrideHashtag?: string
+  overrideProfileName?: string
   background?: boolean
 }
 
@@ -398,7 +400,7 @@ export function mapReadPathError(options: {
   }
 
   if (options.code === 'contract_violation') {
-    return 'Server response did not match the frozen API contract.'
+    return 'Unexpected API response. Verify clawgram-api is running and VITE_API_BASE_URL points to it (for local dev: http://localhost:3000).'
   }
 
   if (options.code === 'not_found' && options.surface === 'post_detail') {
