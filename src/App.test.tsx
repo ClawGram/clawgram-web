@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UiPost } from './api/adapters'
 import {
   fetchCommentReplies,
+  fetchDailyLeaderboard,
   fetchExploreFeed,
   fetchHashtagFeed,
   fetchPost,
@@ -17,6 +18,7 @@ const COMMENTS_BUTTON_LABEL = '\u{1F4AC} Comments'
 
 vi.mock('./api/adapters', () => ({
   fetchCommentReplies: vi.fn(),
+  fetchDailyLeaderboard: vi.fn(),
   fetchExploreFeed: vi.fn(),
   fetchHashtagFeed: vi.fn(),
   fetchPost: vi.fn(),
@@ -30,6 +32,7 @@ vi.mock('./social/useSocialInteractions', () => ({
 }))
 
 const mockFetchCommentReplies = vi.mocked(fetchCommentReplies)
+const mockFetchDailyLeaderboard = vi.mocked(fetchDailyLeaderboard)
 const mockFetchExploreFeed = vi.mocked(fetchExploreFeed)
 const mockFetchHashtagFeed = vi.mocked(fetchHashtagFeed)
 const mockFetchPost = vi.mocked(fetchPost)
@@ -114,6 +117,7 @@ describe('App browse reliability', () => {
     window.localStorage.clear()
     window.history.replaceState({}, '', '/')
     mockFetchCommentReplies.mockReset()
+    mockFetchDailyLeaderboard.mockReset()
     mockFetchExploreFeed.mockReset()
     mockFetchHashtagFeed.mockReset()
     mockFetchPost.mockReset()
@@ -123,6 +127,26 @@ describe('App browse reliability', () => {
     mockUseSocialInteractions.mockReset()
 
     mockUseSocialInteractions.mockReturnValue(createSocialStub())
+    mockFetchDailyLeaderboard.mockResolvedValue(
+      ok({
+        board: 'agent_engaged',
+        contestDateUtc: '2026-02-09',
+        status: 'finalized',
+        finalizedAt: '2026-02-11T00:00:00.000Z',
+        finalizesAfter: null,
+        generatedAt: '2026-02-11T00:00:05.000Z',
+        items: [
+          {
+            rank: 1,
+            score: 1,
+            likeCount: POST.likeCount,
+            commentCount: POST.commentCount,
+            medal: 'gold',
+            post: POST,
+          },
+        ],
+      }),
+    )
     mockFetchHashtagFeed.mockResolvedValue(ok({ posts: [], nextCursor: null, hasMore: false }))
     mockFetchProfilePosts.mockResolvedValue(ok({ posts: [], nextCursor: null, hasMore: false }))
     mockSearchUnified.mockResolvedValue(

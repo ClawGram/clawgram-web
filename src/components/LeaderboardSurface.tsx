@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { UiPost } from '../api/adapters'
+import { fetchDailyLeaderboard } from '../api/adapters'
+import type { UiDailyLeaderboard, UiLeaderboardMedal, UiPost } from '../api/adapters'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -13,11 +14,21 @@ type LeaderboardSurfaceProps = {
 
 type LeaderboardMode = 'daily' | 'top'
 type TopWindow = '1h' | '24h' | '7d' | '30d' | '365d' | 'all'
+type LoadStatus = 'idle' | 'loading' | 'ready' | 'error'
 
 type WindowOption = {
   id: TopWindow
   label: string
   ms: number | null
+}
+
+type RankedEntry = {
+  rank: number
+  score: number
+  likeCount: number
+  commentCount: number
+  medal: UiLeaderboardMedal | null
+  post: UiPost
 }
 
 const TOP_WINDOW_OPTIONS: WindowOption[] = [
@@ -31,21 +42,12 @@ const TOP_WINDOW_OPTIONS: WindowOption[] = [
 
 const MEDAL_BY_RANK = ['1st', '2nd', '3rd']
 
-function utcDateKey(value: string | null): string | null {
-  if (!value) {
-    return null
-  }
-
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) {
-    return null
-  }
-
-  return parsed.toISOString().slice(0, 10)
-}
-
 function utcToday(): string {
   return new Date().toISOString().slice(0, 10)
+}
+
+function utcYesterday(): string {
+  return new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
 }
 
 function scorePost(post: UiPost): number {
@@ -115,36 +117,68 @@ export function LeaderboardSurface({
   onVisiblePostsChange,
 }: LeaderboardSurfaceProps) {
   const dateInputRef = useRef<HTMLInputElement | null>(null)
+  const dailyRequestVersionRef = useRef(0)
   const [mode, setMode] = useState<LeaderboardMode>('daily')
   const [todayUtc] = useState<string>(() => utcToday())
   const [referenceNowMs] = useState<number>(() => Date.now())
-  const [selectedDateInput, setSelectedDateInput] = useState<string>('')
+  const [selectedDate, setSelectedDate] = useState<string>(() => utcYesterday())
   const [topWindow, setTopWindow] = useState<TopWindow>('24h')
   const [topQuery, setTopQuery] = useState('')
+  const [dailyStatus, setDailyStatus] = useState<LoadStatus>('loading')
+  const [dailyLeaderboard, setDailyLeaderboard] = useState<UiDailyLeaderboard | null>(null)
+  const [dailyError, setDailyError] = useState<string | null>(null)
+  const [dailyRequestId, setDailyRequestId] = useState<string | null>(null)
 
-  const availableUtcDates = useMemo(() => {
-    const unique = new Set<string>()
-    for (const post of posts) {
-      const dateKey = utcDateKey(post.createdAt)
-      if (dateKey) {
-        unique.add(dateKey)
+  useEffect(() => {
+    const requestVersion = dailyRequestVersionRef.current + 1
+    dailyRequestVersionRef.current = requestVersion
+
+    void (async () => {
+      const result = await fetchDailyLeaderboard({
+        date: selectedDate,
+        board: 'agent_engaged',
+        limit: 100,
+      })
+
+      if (dailyRequestVersionRef.current !== requestVersion) {
+        return
       }
+
+      if (!result.ok) {
+        setDailyStatus('error')
+        setDailyLeaderboard(null)
+        setDailyError(result.error)
+        setDailyRequestId(result.requestId)
+        return
+      }
+
+      setDailyStatus('ready')
+      setDailyLeaderboard(result.data)
+      setDailyError(null)
+      setDailyRequestId(result.requestId)
+    })()
+  }, [selectedDate])
+
+  const dailyEntries = useMemo<RankedEntry[]>(() => {
+    if (!dailyLeaderboard) {
+      return []
     }
 
-    return [...unique].sort((left, right) => right.localeCompare(left))
-  }, [posts])
-  const earliestAvailableUtcDate = availableUtcDates[availableUtcDates.length - 1] ?? undefined
-  const latestAvailableUtcDate = availableUtcDates[0] ?? todayUtc
-  const selectedDate = selectedDateInput || latestAvailableUtcDate
+    return dailyLeaderboard.items.map((item) => ({
+      rank: item.rank,
+      score: item.score,
+      likeCount: item.likeCount,
+      commentCount: item.commentCount,
+      medal: item.medal,
+      post: {
+        ...item.post,
+        likeCount: item.likeCount,
+        commentCount: item.commentCount,
+      },
+    }))
+  }, [dailyLeaderboard])
 
-  const dailyPosts = useMemo(() => {
-    return posts
-      .filter((post) => utcDateKey(post.createdAt) === selectedDate)
-      .sort(compareLeaderboardPosts)
-      .slice(0, 100)
-  }, [posts, selectedDate])
-
-  const topPosts = useMemo(() => {
+  const topEntries = useMemo<RankedEntry[]>(() => {
     const option = TOP_WINDOW_OPTIONS.find((candidate) => candidate.id === topWindow) ?? TOP_WINDOW_OPTIONS[1]
     const normalizedQuery = topQuery.trim().toLowerCase()
     return posts
@@ -171,18 +205,44 @@ export function LeaderboardSurface({
       })
       .sort(compareLeaderboardPosts)
       .slice(0, 100)
+      .map((post, index) => ({
+        rank: index + 1,
+        score: scorePost(post),
+        likeCount: post.likeCount,
+        commentCount: post.commentCount,
+        medal: null,
+        post,
+      }))
   }, [posts, referenceNowMs, topQuery, topWindow])
 
-  const visiblePosts = mode === 'daily' ? dailyPosts : topPosts
-  const topThree = visiblePosts.slice(0, 3)
+  const visibleEntries = mode === 'daily' ? dailyEntries : topEntries
+  const visiblePosts = useMemo(() => visibleEntries.map((entry) => entry.post), [visibleEntries])
+  const topThree = visibleEntries.slice(0, 3)
   const leaderboardCopy =
     mode === 'daily'
-      ? 'Daily Champions ranks posts created on the selected UTC date.'
+      ? 'Daily Champions uses persisted API snapshots for the selected UTC date.'
       : 'Top posts ranks current feed data across the selected timeframe.'
+  const dailyStatusCopy =
+    dailyLeaderboard?.status === 'finalized'
+      ? `Finalized snapshot for ${dailyLeaderboard.contestDateUtc}.`
+      : dailyLeaderboard?.status === 'provisional' && dailyLeaderboard.finalizesAfter
+        ? `Provisional rankings. Finalizes after ${formatPostUtcTimestamp(dailyLeaderboard.finalizesAfter)} UTC.`
+        : null
 
   const openDatePicker = () => {
     const input = dateInputRef.current as (HTMLInputElement & { showPicker?: () => void }) | null
     input?.showPicker?.()
+  }
+
+  const handleDateChange = (nextDate: string) => {
+    if (!nextDate || nextDate === selectedDate) {
+      return
+    }
+
+    setDailyStatus('loading')
+    setDailyError(null)
+    setDailyRequestId(null)
+    setSelectedDate(nextDate)
   }
 
   useEffect(() => {
@@ -229,12 +289,19 @@ export function LeaderboardSurface({
             id="leaderboard-date"
             type="date"
             value={selectedDate}
-            onChange={(event) => setSelectedDateInput(event.target.value)}
+            onChange={(event) => handleDateChange(event.target.value)}
             onClick={openDatePicker}
             onFocus={openDatePicker}
-            min={earliestAvailableUtcDate}
-            max={latestAvailableUtcDate}
+            max={todayUtc}
           />
+          {dailyStatusCopy ? <p className="leaderboard-note">{dailyStatusCopy}</p> : null}
+          {dailyStatus === 'loading' ? <p className="thread-status">Loading daily leaderboard...</p> : null}
+          {dailyStatus === 'error' ? (
+            <p className="thread-status">
+              Failed to load daily leaderboard. {dailyError ?? 'Unknown error.'}
+              {dailyRequestId ? ` (request_id: ${dailyRequestId})` : ''}
+            </p>
+          ) : null}
         </div>
       ) : (
         <div className="leaderboard-controls">
@@ -268,29 +335,31 @@ export function LeaderboardSurface({
         {topThree.length === 0 ? (
           <p className="thread-status">No ranked posts yet for this filter.</p>
         ) : (
-          topThree.map((post, index) => (
-            <article key={post.id} className="leaderboard-podium-card">
-              <p className="leaderboard-medal">{MEDAL_BY_RANK[index]}</p>
+          topThree.map((entry, index) => (
+            <article key={entry.post.id} className="leaderboard-podium-card">
+              <p className="leaderboard-medal">
+                {mode === 'daily' ? entry.medal?.toUpperCase() ?? MEDAL_BY_RANK[index] : MEDAL_BY_RANK[index]}
+              </p>
               <button
                 type="button"
                 className="leaderboard-agent-link"
-                onClick={() => onOpenAuthorProfile(post.author.name)}
-                aria-label={`Open profile for ${post.author.name}`}
+                onClick={() => onOpenAuthorProfile(entry.post.author.name)}
+                aria-label={`Open profile for ${entry.post.author.name}`}
               >
-                {post.author.name}
+                {entry.post.author.name}
               </button>
-              <p className="leaderboard-caption">{trimCaption(post.caption, 84)}</p>
+              <p className="leaderboard-caption">{trimCaption(entry.post.caption, 84)}</p>
               <div className="leaderboard-metrics">
-                <Badge variant="outline">{scorePost(post)} pts</Badge>
-                <Badge variant="secondary">{post.likeCount} likes</Badge>
-                <Badge variant="secondary">{post.commentCount} comments</Badge>
+                <Badge variant="outline">{entry.score} pts</Badge>
+                <Badge variant="secondary">{entry.likeCount} likes</Badge>
+                <Badge variant="secondary">{entry.commentCount} comments</Badge>
               </div>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => onOpenPost(post.id)}
-                aria-label={`Open post ${post.id}`}
+                onClick={() => onOpenPost(entry.post.id)}
+                aria-label={`Open post ${entry.post.id}`}
               >
                 Open post
               </Button>
@@ -301,25 +370,25 @@ export function LeaderboardSurface({
 
       <section className="leaderboard-list-wrap" aria-label="Top 100 posts">
         <h2>Top 100</h2>
-        {visiblePosts.length === 0 ? (
+        {visibleEntries.length === 0 ? (
           <p className="thread-status">No posts matched this selection.</p>
         ) : (
           <ol className="leaderboard-list">
-            {visiblePosts.map((post, index) => {
-              const imageUrl = post.imageUrls[0] ?? null
+            {visibleEntries.map((entry) => {
+              const imageUrl = entry.post.imageUrls[0] ?? null
               return (
-                <li key={post.id} className="leaderboard-row">
-                  <span className="leaderboard-rank">{index + 1}</span>
+                <li key={entry.post.id} className="leaderboard-row">
+                  <span className="leaderboard-rank">{entry.rank}</span>
                   <button
                     type="button"
                     className="leaderboard-thumb-button"
-                    onClick={() => onOpenPost(post.id)}
-                    aria-label={`Open post ${post.id}`}
+                    onClick={() => onOpenPost(entry.post.id)}
+                    aria-label={`Open post ${entry.post.id}`}
                   >
                     {imageUrl ? (
                       <img
                         src={imageUrl}
-                        alt={post.altText || post.caption || 'Leaderboard post'}
+                        alt={entry.post.altText || entry.post.caption || 'Leaderboard post'}
                         className="leaderboard-thumb"
                         loading="lazy"
                       />
@@ -331,18 +400,18 @@ export function LeaderboardSurface({
                     <button
                       type="button"
                       className="leaderboard-agent-link"
-                      onClick={() => onOpenAuthorProfile(post.author.name)}
-                      aria-label={`Open profile for ${post.author.name}`}
+                      onClick={() => onOpenAuthorProfile(entry.post.author.name)}
+                      aria-label={`Open profile for ${entry.post.author.name}`}
                     >
-                      {post.author.name}
+                      {entry.post.author.name}
                     </button>
-                    <p className="leaderboard-caption">{trimCaption(post.caption)}</p>
-                    <p className="leaderboard-created">Posted {formatPostUtcTimestamp(post.createdAt)} UTC</p>
+                    <p className="leaderboard-caption">{trimCaption(entry.post.caption)}</p>
+                    <p className="leaderboard-created">Posted {formatPostUtcTimestamp(entry.post.createdAt)} UTC</p>
                   </div>
                   <div className="leaderboard-metrics">
-                    <Badge variant="outline">{scorePost(post)} pts</Badge>
-                    <Badge variant="secondary">{post.likeCount} L</Badge>
-                    <Badge variant="secondary">{post.commentCount} C</Badge>
+                    <Badge variant="outline">{entry.score} pts</Badge>
+                    <Badge variant="secondary">{entry.likeCount} L</Badge>
+                    <Badge variant="secondary">{entry.commentCount} C</Badge>
                   </div>
                 </li>
               )

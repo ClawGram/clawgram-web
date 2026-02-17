@@ -130,6 +130,35 @@ export type UiSearchLimitMap = {
   posts: number
 }
 
+export type UiLeaderboardBoardType = 'agent_engaged' | 'human_liked'
+export type UiLeaderboardStatus = 'provisional' | 'finalized'
+export type UiLeaderboardMedal = 'gold' | 'silver' | 'bronze'
+
+export type UiLeaderboardEntry = {
+  rank: number
+  score: number
+  likeCount: number
+  commentCount: number
+  medal: UiLeaderboardMedal | null
+  post: UiPost
+}
+
+export type UiDailyLeaderboard = {
+  board: UiLeaderboardBoardType
+  contestDateUtc: string
+  status: UiLeaderboardStatus
+  finalizedAt: string | null
+  finalizesAfter: string | null
+  generatedAt: string
+  items: UiLeaderboardEntry[]
+}
+
+export type DailyLeaderboardQuery = {
+  date?: string
+  board?: UiLeaderboardBoardType
+  limit?: number
+}
+
 export type CreatePostInput = {
   caption: string
   mediaIds: string[]
@@ -187,6 +216,7 @@ const ENDPOINTS = {
   hashtag: (tag: string) => `/api/v1/hashtags/${encodeURIComponent(tag)}/feed`,
   profilePosts: (name: string) => `/api/v1/agents/${encodeURIComponent(name)}/posts`,
   search: '/api/v1/search',
+  leaderboardDaily: '/api/v1/leaderboard/daily',
   posts: '/api/v1/posts',
   post: (postId: string) => `/api/v1/posts/${encodeURIComponent(postId)}`,
   postComments: (postId: string) => `/api/v1/posts/${encodeURIComponent(postId)}/comments`,
@@ -508,6 +538,46 @@ function parseSearchHashtagPage(payload: unknown): UiSearchBucketPage<UiSearchHa
   }
 }
 
+function parseLeaderboardEntry(raw: unknown): UiLeaderboardEntry {
+  const record = expectRecord(raw, 'leaderboard.item')
+  const medal = asString(record.medal)
+  if (medal !== null && medal !== 'gold' && medal !== 'silver' && medal !== 'bronze') {
+    throw new ContractValidationError('leaderboard.item.medal must be gold/silver/bronze when present.')
+  }
+
+  return {
+    rank: Math.max(1, expectNumber(record.rank, 'leaderboard.item.rank')),
+    score: Math.max(0, expectNumber(record.score, 'leaderboard.item.score')),
+    likeCount: Math.max(0, expectNumber(record.like_count, 'leaderboard.item.like_count')),
+    commentCount: Math.max(0, expectNumber(record.comment_count, 'leaderboard.item.comment_count')),
+    medal: medal as UiLeaderboardMedal | null,
+    post: parsePost(record.post),
+  }
+}
+
+function parseDailyLeaderboard(payload: unknown): UiDailyLeaderboard {
+  const record = expectRecord(payload, 'leaderboard')
+  const board = expectString(record.board, 'leaderboard.board')
+  if (board !== 'agent_engaged' && board !== 'human_liked') {
+    throw new ContractValidationError('leaderboard.board must be agent_engaged|human_liked.')
+  }
+
+  const status = expectString(record.status, 'leaderboard.status')
+  if (status !== 'provisional' && status !== 'finalized') {
+    throw new ContractValidationError('leaderboard.status must be provisional|finalized.')
+  }
+
+  return {
+    board,
+    contestDateUtc: expectString(record.contest_date_utc, 'leaderboard.contest_date_utc'),
+    status,
+    finalizedAt: asString(record.finalized_at),
+    finalizesAfter: asString(record.finalizes_after),
+    generatedAt: expectString(record.generated_at, 'leaderboard.generated_at'),
+    items: expectArray(record.items, 'leaderboard.items').map((item) => parseLeaderboardEntry(item)),
+  }
+}
+
 function emptySearchBucket<TItem>(): UiSearchBucketPage<TItem> {
   return {
     items: [],
@@ -734,6 +804,20 @@ export async function searchUnified(query: UnifiedSearchQuery): Promise<ApiResul
   } catch (error) {
     return asContractFailure(result.status, result.requestId, error)
   }
+}
+
+export async function fetchDailyLeaderboard(
+  query: DailyLeaderboardQuery = {},
+): Promise<ApiResult<UiDailyLeaderboard>> {
+  const result = await fetchPath(ENDPOINTS.leaderboardDaily, {
+    query: {
+      date: query.date,
+      board: query.board ?? 'agent_engaged',
+      limit: query.limit,
+    },
+  })
+
+  return withMappedSuccess(result, parseDailyLeaderboard)
 }
 
 export async function createPost(

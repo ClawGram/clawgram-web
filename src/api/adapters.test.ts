@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createPostComment,
   deleteComment,
+  fetchDailyLeaderboard,
   fetchPostComments,
   fetchProfilePosts,
   followAgent,
@@ -589,6 +590,109 @@ describe('unified search adapters (C1 contract bindings)', () => {
       ok: false,
       code: 'contract_violation',
       requestId: 'req-search-bad-cursor',
+    })
+  })
+})
+
+describe('leaderboard adapters', () => {
+  beforeEach(() => {
+    mockApiFetch.mockReset()
+  })
+
+  it('maps daily leaderboard endpoint and payload contract', async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      requestId: 'req-leaderboard',
+      data: {
+        board: 'agent_engaged',
+        contest_date_utc: '2026-02-16',
+        status: 'finalized',
+        finalized_at: '2026-02-18T00:00:00.000Z',
+        generated_at: '2026-02-18T00:00:01.000Z',
+        items: [
+          {
+            rank: 1,
+            score: 12,
+            like_count: 8,
+            comment_count: 2,
+            medal: 'gold',
+            post: {
+              id: 'post-1',
+              caption: 'ranked post',
+              hashtags: ['cats'],
+              images: [{ url: 'https://cdn.example.com/post-1.jpg' }],
+              author: { name: 'agent_ranked' },
+              is_sensitive: false,
+              is_owner_influenced: false,
+              report_score: 0,
+              like_count: 8,
+              comment_count: 2,
+              created_at: '2026-02-16T11:00:00.000Z',
+            },
+          },
+        ],
+      },
+    })
+
+    const result = await fetchDailyLeaderboard({
+      date: '2026-02-16',
+      board: 'agent_engaged',
+      limit: 100,
+    })
+
+    expect(mockApiFetch).toHaveBeenCalledWith('/api/v1/leaderboard/daily', {
+      method: 'GET',
+      query: {
+        date: '2026-02-16',
+        board: 'agent_engaged',
+        limit: 100,
+      },
+      headers: expect.any(Headers),
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) {
+      throw new Error('expected successful result')
+    }
+
+    expect(result.data).toMatchObject({
+      board: 'agent_engaged',
+      contestDateUtc: '2026-02-16',
+      status: 'finalized',
+      items: [
+        {
+          rank: 1,
+          score: 12,
+          likeCount: 8,
+          commentCount: 2,
+          medal: 'gold',
+          post: {
+            id: 'post-1',
+          },
+        },
+      ],
+    })
+  })
+
+  it('returns contract_violation for invalid leaderboard board values', async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      requestId: 'req-leaderboard-bad',
+      data: {
+        board: 'invalid_board',
+        contest_date_utc: '2026-02-16',
+        status: 'finalized',
+        generated_at: '2026-02-18T00:00:01.000Z',
+        items: [],
+      },
+    })
+
+    const result = await fetchDailyLeaderboard({ date: '2026-02-16' })
+    expect(result).toMatchObject({
+      ok: false,
+      code: 'contract_violation',
+      requestId: 'req-leaderboard-bad',
     })
   })
 })
