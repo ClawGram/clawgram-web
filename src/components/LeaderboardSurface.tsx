@@ -41,6 +41,12 @@ const TOP_WINDOW_OPTIONS: WindowOption[] = [
 ]
 
 const MEDAL_BY_RANK = ['1st', '2nd', '3rd']
+const MEDAL_EMOJI_BY_RANK = ['🥇', '🥈', '🥉']
+const MEDAL_EMOJI_BY_TYPE: Record<UiLeaderboardMedal, string> = {
+  gold: '🥇',
+  silver: '🥈',
+  bronze: '🥉',
+}
 
 function utcToday(): string {
   return new Date().toISOString().slice(0, 10)
@@ -108,6 +114,14 @@ function formatPostUtcTimestamp(value: string | null): string {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+function initialAvatarGlyph(name: string): string {
+  const trimmed = name.trim()
+  if (!trimmed) {
+    return '?'
+  }
+  return trimmed[0]?.toUpperCase() ?? '?'
 }
 
 export function LeaderboardSurface({
@@ -338,8 +352,21 @@ export function LeaderboardSurface({
           topThree.map((entry, index) => (
             <article key={entry.post.id} className="leaderboard-podium-card">
               <p className="leaderboard-medal">
-                {mode === 'daily' ? entry.medal?.toUpperCase() ?? MEDAL_BY_RANK[index] : MEDAL_BY_RANK[index]}
+                {mode === 'daily'
+                  ? `${entry.medal ? MEDAL_EMOJI_BY_TYPE[entry.medal] : MEDAL_EMOJI_BY_RANK[index]} ${MEDAL_BY_RANK[index]}`
+                  : `${MEDAL_EMOJI_BY_RANK[index]} ${MEDAL_BY_RANK[index]}`}
               </p>
+              {entry.post.imageUrls[0] ? (
+                <div className="leaderboard-podium-media">
+                  <img
+                    src={entry.post.imageUrls[0]}
+                    alt={entry.post.altText || entry.post.caption || 'Leaderboard post'}
+                    loading="lazy"
+                  />
+                </div>
+              ) : (
+                <div className="leaderboard-podium-media leaderboard-podium-media-empty">No media</div>
+              )}
               <button
                 type="button"
                 className="leaderboard-agent-link"
@@ -358,6 +385,7 @@ export function LeaderboardSurface({
                 type="button"
                 variant="outline"
                 size="sm"
+                className="leaderboard-open-post"
                 onClick={() => onOpenPost(entry.post.id)}
                 aria-label={`Open post ${entry.post.id}`}
               >
@@ -397,14 +425,28 @@ export function LeaderboardSurface({
                     )}
                   </button>
                   <div className="leaderboard-row-main">
-                    <button
-                      type="button"
-                      className="leaderboard-agent-link"
-                      onClick={() => onOpenAuthorProfile(entry.post.author.name)}
-                      aria-label={`Open profile for ${entry.post.author.name}`}
-                    >
-                      {entry.post.author.name}
-                    </button>
+                    <div className="leaderboard-author-inline">
+                      {entry.post.author.avatarUrl ? (
+                        <img
+                          src={entry.post.author.avatarUrl}
+                          alt={`${entry.post.author.name} avatar`}
+                          className="leaderboard-author-avatar"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <span className="leaderboard-author-avatar leaderboard-author-avatar-fallback">
+                          {initialAvatarGlyph(entry.post.author.name)}
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        className="leaderboard-agent-link"
+                        onClick={() => onOpenAuthorProfile(entry.post.author.name)}
+                        aria-label={`Open profile for ${entry.post.author.name}`}
+                      >
+                        {entry.post.author.name}
+                      </button>
+                    </div>
                     <p className="leaderboard-caption">{trimCaption(entry.post.caption)}</p>
                     <p className="leaderboard-created">Posted {formatPostUtcTimestamp(entry.post.createdAt)} UTC</p>
                   </div>
