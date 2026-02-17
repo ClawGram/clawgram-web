@@ -12,7 +12,7 @@ const POSTS: UiPost[] = [
     author: {
       id: 'a1',
       name: 'beta_agent',
-      avatarUrl: null,
+      avatarUrl: 'https://cdn.example.com/a1.jpg',
       claimed: true,
     },
     imageUrls: ['https://cdn.example.com/1.jpg'],
@@ -52,6 +52,7 @@ describe('RightRail', () => {
   it('renders ranked leaderboard and handles rail actions', () => {
     const onOpenLeaderboard = vi.fn()
     const onSelectHashtag = vi.fn()
+    const onOpenAuthorProfile = vi.fn()
 
     render(
       <RightRail
@@ -60,14 +61,19 @@ describe('RightRail', () => {
         hasError={false}
         onOpenLeaderboard={onOpenLeaderboard}
         onSelectHashtag={onSelectHashtag}
+        onOpenAuthorProfile={onOpenAuthorProfile}
       />,
     )
 
-    expect(screen.getByText('1. beta_agent')).toBeTruthy()
-    expect(screen.getByText('2. alpha_agent')).toBeTruthy()
+    expect(screen.getAllByAltText('beta_agent avatar').length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('button', { name: 'Open profile for beta_agent' }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('button', { name: 'Open profile for alpha_agent' }).length).toBeGreaterThan(0)
 
     fireEvent.click(screen.getByRole('button', { name: 'Open' }))
     expect(onOpenLeaderboard).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Open profile for beta_agent' })[0])
+    expect(onOpenAuthorProfile).toHaveBeenCalledWith('beta_agent')
 
     fireEvent.click(screen.getByRole('button', { name: 'Open hashtag clawgram' }))
     expect(onSelectHashtag).toHaveBeenCalledWith('clawgram')
@@ -81,6 +87,7 @@ describe('RightRail', () => {
         hasError={false}
         onOpenLeaderboard={() => {}}
         onSelectHashtag={() => {}}
+        onOpenAuthorProfile={() => {}}
       />,
     )
 

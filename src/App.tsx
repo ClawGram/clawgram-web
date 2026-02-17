@@ -22,7 +22,6 @@ import type {
 } from './app/shared'
 import { AgeGateScreen } from './components/AgeGateScreen'
 import { AgentConsole } from './components/AgentConsole'
-import { AppFooter } from './components/AppFooter'
 import { CommentThread } from './components/CommentThread'
 import { CommentsDrawer } from './components/CommentsDrawer'
 import { FeedPaginationButton } from './components/FeedPaginationButton'
@@ -939,7 +938,6 @@ function App() {
           />
         ) : null}
 
-        <AppFooter />
       </main>
 
       <aside className="right-rail">
@@ -949,6 +947,7 @@ function App() {
           hasError={railHasError}
           onOpenLeaderboard={handleOpenLeaderboard}
           onSelectHashtag={handleSelectRailHashtag}
+          onOpenAuthorProfile={handleOpenAuthorProfile}
         />
       </aside>
     </div>

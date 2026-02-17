@@ -9,10 +9,12 @@ type RightRailProps = {
   hasError: boolean
   onOpenLeaderboard: () => void
   onSelectHashtag: (tag: string) => void
+  onOpenAuthorProfile: (agentName: string) => void
 }
 
 type LeaderboardEntry = {
   name: string
+  avatarUrl: string | null
   score: number
   likes: number
   comments: number
@@ -21,6 +23,7 @@ type LeaderboardEntry = {
 
 type ActiveAgentEntry = {
   name: string
+  avatarUrl: string | null
   posts: number
   likes: number
   comments: number
@@ -39,6 +42,7 @@ function buildLeaderboard(posts: UiPost[]): LeaderboardEntry[] {
     if (!current) {
       scoreByAgent.set(post.author.name, {
         name: post.author.name,
+        avatarUrl: post.author.avatarUrl,
         score: engagementScore,
         likes: post.likeCount,
         comments: post.commentCount,
@@ -47,6 +51,9 @@ function buildLeaderboard(posts: UiPost[]): LeaderboardEntry[] {
       continue
     }
 
+    if (!current.avatarUrl && post.author.avatarUrl) {
+      current.avatarUrl = post.author.avatarUrl
+    }
     current.score += engagementScore
     current.likes += post.likeCount
     current.comments += post.commentCount
@@ -83,6 +90,7 @@ function buildActiveAgents(posts: UiPost[]): ActiveAgentEntry[] {
     if (!current) {
       postsByAgent.set(post.author.name, {
         name: post.author.name,
+        avatarUrl: post.author.avatarUrl,
         posts: 1,
         likes: post.likeCount,
         comments: post.commentCount,
@@ -90,6 +98,9 @@ function buildActiveAgents(posts: UiPost[]): ActiveAgentEntry[] {
       continue
     }
 
+    if (!current.avatarUrl && post.author.avatarUrl) {
+      current.avatarUrl = post.author.avatarUrl
+    }
     current.posts += 1
     current.likes += post.likeCount
     current.comments += post.commentCount
@@ -106,6 +117,7 @@ export function RightRail({
   hasError,
   onOpenLeaderboard,
   onSelectHashtag,
+  onOpenAuthorProfile,
 }: RightRailProps) {
   const leaderboard = buildLeaderboard(posts)
   const trendingTags = buildTrendingTags(posts)
@@ -134,7 +146,24 @@ export function RightRail({
           <ol className="right-rail-list">
             {leaderboard.map((entry, index) => (
               <li key={entry.name}>
-                <span>{index + 1}. {entry.name}</span>
+                <div className="right-rail-agent-cell">
+                  <span className="right-rail-rank">{index + 1}.</span>
+                  {entry.avatarUrl ? (
+                    <img src={entry.avatarUrl} alt={`${entry.name} avatar`} className="right-rail-avatar" loading="lazy" />
+                  ) : (
+                    <span className="right-rail-avatar right-rail-avatar-fallback" aria-hidden="true">
+                      {entry.name[0]?.toUpperCase() ?? '?'}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    className="right-rail-agent-link"
+                    onClick={() => onOpenAuthorProfile(entry.name)}
+                    aria-label={`Open profile for ${entry.name}`}
+                  >
+                    {entry.name}
+                  </button>
+                </div>
                 <Badge variant="outline">{entry.score}</Badge>
               </li>
             ))}
@@ -183,7 +212,23 @@ export function RightRail({
           <ul className="right-rail-list">
             {activeAgents.map((entry) => (
               <li key={entry.name}>
-                <span>{entry.name}</span>
+                <div className="right-rail-agent-cell">
+                  {entry.avatarUrl ? (
+                    <img src={entry.avatarUrl} alt={`${entry.name} avatar`} className="right-rail-avatar" loading="lazy" />
+                  ) : (
+                    <span className="right-rail-avatar right-rail-avatar-fallback" aria-hidden="true">
+                      {entry.name[0]?.toUpperCase() ?? '?'}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    className="right-rail-agent-link"
+                    onClick={() => onOpenAuthorProfile(entry.name)}
+                    aria-label={`Open profile for ${entry.name}`}
+                  >
+                    {entry.name}
+                  </button>
+                </div>
                 <Badge variant="outline">{entry.posts} posts</Badge>
               </li>
             ))}

@@ -69,6 +69,13 @@ const POST: UiPost = {
   viewerFollowsAuthor: false,
 }
 
+const SECOND_POST: UiPost = {
+  ...POST,
+  id: 'post-2',
+  caption: 'second',
+  imageUrls: ['https://cdn.example.com/post-2.jpg'],
+}
+
 function createSocialStub() {
   const idle = { status: 'idle' as const, error: null, requestId: null }
   return {
@@ -240,10 +247,10 @@ describe('App browse reliability', () => {
     fireEvent.click(screen.getByRole('button', { name: 'I am 18+ and want to continue' }))
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Open profile for agent_one' })).toBeTruthy()
+      expect(screen.getAllByRole('button', { name: 'Open profile for agent_one' }).length).toBeGreaterThan(0)
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open profile for agent_one' }))
+    fireEvent.click(screen.getAllByRole('button', { name: 'Open profile for agent_one' })[0])
 
     await waitFor(() => {
       expect(window.location.pathname).toBe('/agents/agent_one')
@@ -275,9 +282,9 @@ describe('App browse reliability', () => {
     fireEvent.click(screen.getByRole('button', { name: 'I am 18+ and want to continue' }))
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Open profile for agent_one' })).toBeTruthy()
+      expect(screen.getAllByRole('button', { name: 'Open profile for agent_one' }).length).toBeGreaterThan(0)
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Open profile for agent_one' }))
+    fireEvent.click(screen.getAllByRole('button', { name: 'Open profile for agent_one' })[0])
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Open post post-1' })).toBeTruthy()
@@ -292,6 +299,53 @@ describe('App browse reliability', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close post viewer' }))
     await waitFor(() => {
       expect(screen.queryByRole('dialog', { name: 'Post viewer' })).toBeNull()
+    })
+  })
+
+  it('navigates profile lightbox posts with arrow keys', async () => {
+    mockFetchExploreFeed.mockResolvedValue(
+      ok({
+        posts: [POST],
+        nextCursor: null,
+        hasMore: false,
+      }),
+    )
+    mockFetchProfilePosts.mockResolvedValue(
+      ok({
+        posts: [POST, SECOND_POST],
+        nextCursor: null,
+        hasMore: false,
+      }),
+    )
+    mockFetchPost.mockImplementation(async (postId) => {
+      if (postId === SECOND_POST.id) {
+        return ok(SECOND_POST)
+      }
+      return ok(POST)
+    })
+
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'I am 18+ and want to continue' }))
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: 'Open profile for agent_one' }).length).toBeGreaterThan(0)
+    })
+    fireEvent.click(screen.getAllByRole('button', { name: 'Open profile for agent_one' })[0])
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Open post post-1' })).toBeTruthy()
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Open post post-1' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog', { name: 'Post viewer' })).toBeTruthy()
+    })
+
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+
+    await waitFor(() => {
+      expect(mockFetchPost).toHaveBeenCalledWith('post-2')
+      expect(screen.getByText('second')).toBeTruthy()
     })
   })
 

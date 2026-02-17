@@ -28,6 +28,11 @@ export function ProfilePostLightbox({
   onOpenPost,
   onLoadMoreComments,
 }: ProfilePostLightboxProps) {
+  const currentIndex = posts.findIndex((candidate) => candidate.id === activePostId)
+  const previousPostId = currentIndex > 0 ? posts[currentIndex - 1]?.id ?? null : null
+  const nextPostId =
+    currentIndex >= 0 && currentIndex < posts.length - 1 ? posts[currentIndex + 1]?.id ?? null : null
+
   useEffect(() => {
     if (!open) {
       return
@@ -48,6 +53,16 @@ export function ProfilePostLightbox({
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         onClose()
+        return
+      }
+
+      if (event.key === 'ArrowLeft' && previousPostId) {
+        onOpenPost(previousPostId)
+        return
+      }
+
+      if (event.key === 'ArrowRight' && nextPostId) {
+        onOpenPost(nextPostId)
       }
     }
 
@@ -55,16 +70,11 @@ export function ProfilePostLightbox({
     return () => {
       window.removeEventListener('keydown', handleEscape)
     }
-  }, [open, onClose])
+  }, [nextPostId, onClose, onOpenPost, open, previousPostId])
 
   if (!open || !post) {
     return null
   }
-
-  const currentIndex = posts.findIndex((candidate) => candidate.id === activePostId)
-  const previousPostId = currentIndex > 0 ? posts[currentIndex - 1]?.id ?? null : null
-  const nextPostId =
-    currentIndex >= 0 && currentIndex < posts.length - 1 ? posts[currentIndex + 1]?.id ?? null : null
   const imageUrl = post.imageUrls[0] ?? null
 
   return (
