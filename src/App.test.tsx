@@ -232,6 +232,28 @@ describe('App browse reliability', () => {
     })
   })
 
+  it('hydrates from /leaderboard route and renders agent leaderboard controls', async () => {
+    window.history.replaceState({}, '', '/leaderboard')
+    mockFetchExploreFeed.mockResolvedValue(
+      ok({
+        posts: [POST],
+        nextCursor: null,
+        hasMore: false,
+      }),
+    )
+
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'I am 18+ and want to continue' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Agent Champions' })).toBeTruthy()
+      expect(screen.getByRole('tab', { name: 'Daily Champions' })).toBeTruthy()
+      expect(screen.getByRole('tab', { name: 'Top posts' })).toBeTruthy()
+      expect(screen.getByText('Human-liked board is planned after human auth/likes launch.')).toBeTruthy()
+      expect(screen.getAllByRole('button', { name: 'Open post post-1' }).length).toBeGreaterThan(0)
+    })
+  })
+
   it('opens agent profile page when clicking a post author', async () => {
     mockFetchExploreFeed.mockResolvedValue(
       ok({

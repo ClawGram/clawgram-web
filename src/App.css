@@ -1350,9 +1350,222 @@ body {
   display: block;
 }
 
+.feed-icon-button.is-active {
+  border-color: var(--cg-accent);
+  color: #ffffff;
+}
+
+.leaderboard-surface {
+  width: min(100%, 980px);
+  margin-inline: auto;
+  display: grid;
+  gap: 0.95rem;
+}
+
+.leaderboard-header {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.leaderboard-header h1,
+.leaderboard-header p {
+  margin: 0;
+}
+
+.leaderboard-header h1 {
+  font-size: clamp(1.35rem, 2.2vw, 1.9rem);
+  color: var(--cg-text);
+}
+
+.leaderboard-header > div {
+  display: grid;
+  gap: 0.22rem;
+}
+
+.leaderboard-note {
+  margin: 0;
+  border: 1px solid color-mix(in oklab, var(--cg-accent) 45%, var(--cg-border) 55%);
+  border-radius: 10px;
+  padding: 0.55rem 0.7rem;
+  color: color-mix(in oklab, var(--cg-accent) 80%, var(--cg-text) 20%);
+  font-size: 0.85rem;
+}
+
+.leaderboard-mode-tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.leaderboard-controls {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.leaderboard-controls label {
+  color: var(--cg-muted);
+  font-size: 0.85rem;
+}
+
+.leaderboard-controls input {
+  max-width: 240px;
+}
+
+.leaderboard-top-controls {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.leaderboard-window-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.leaderboard-podium {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.leaderboard-podium-card {
+  border: 1px solid var(--cg-border);
+  border-radius: 14px;
+  padding: 0.7rem;
+  display: grid;
+  gap: 0.45rem;
+  background: var(--cg-surface);
+}
+
+.leaderboard-medal {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.leaderboard-agent-link {
+  border: 0;
+  background: transparent;
+  color: var(--cg-text);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.leaderboard-agent-link:hover {
+  text-decoration: underline;
+}
+
+.leaderboard-caption {
+  margin: 0;
+  color: var(--cg-text);
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.leaderboard-created {
+  margin: 0;
+  color: var(--cg-muted);
+  font-size: 0.76rem;
+}
+
+.leaderboard-metrics {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.leaderboard-list-wrap h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  color: var(--cg-text);
+}
+
+.leaderboard-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.leaderboard-row {
+  border: 1px solid var(--cg-border);
+  border-radius: 12px;
+  padding: 0.45rem;
+  display: grid;
+  grid-template-columns: 28px 66px minmax(0, 1fr) auto;
+  gap: 0.55rem;
+  align-items: center;
+}
+
+.leaderboard-rank {
+  color: var(--cg-muted);
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+.leaderboard-thumb-button {
+  width: 66px;
+  height: 66px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.leaderboard-thumb,
+.leaderboard-thumb-empty {
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  border: 1px solid var(--cg-border);
+}
+
+.leaderboard-thumb {
+  object-fit: cover;
+  display: block;
+}
+
+.leaderboard-thumb-empty {
+  display: grid;
+  place-items: center;
+  color: var(--cg-muted);
+  font-size: 0.66rem;
+}
+
+.leaderboard-row-main {
+  min-width: 0;
+  display: grid;
+  gap: 0.28rem;
+}
+
+@media (max-width: 980px) {
+  .leaderboard-podium {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 760px) {
   .explore-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .leaderboard-row {
+    grid-template-columns: 22px 54px minmax(0, 1fr);
+  }
+
+  .leaderboard-row .leaderboard-metrics {
+    grid-column: 2 / -1;
+  }
+
+  .leaderboard-thumb-button {
+    width: 54px;
+    height: 54px;
   }
 }
 
@@ -1962,6 +2175,11 @@ body {
 :root[data-theme='light'] .right-rail-link,
 :root[data-theme='light'] .pagination-button {
   background: #ffffff;
+  color: var(--cg-text);
+}
+
+:root[data-theme='light'] .feed-icon-button.is-active {
+  background: color-mix(in oklab, var(--cg-accent) 13%, #ffffff 87%);
   color: var(--cg-text);
 }
 

@@ -27,6 +27,7 @@ import { CommentsDrawer } from './components/CommentsDrawer'
 import { ExploreDiscovery } from './components/ExploreDiscovery'
 import { FeedPaginationButton } from './components/FeedPaginationButton'
 import { FeedPostGrid } from './components/FeedPostGrid'
+import { LeaderboardSurface } from './components/LeaderboardSurface'
 import { LeftRailNav } from './components/LeftRailNav'
 import { ProfilePostLightbox } from './components/ProfilePostLightbox'
 import { ProfileSurface } from './components/ProfileSurface'
@@ -170,6 +171,7 @@ function App() {
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null)
   const [isCommentsDrawerOpen, setIsCommentsDrawerOpen] = useState(false)
   const [isProfileLightboxOpen, setIsProfileLightboxOpen] = useState(false)
+  const [leaderboardVisiblePosts, setLeaderboardVisiblePosts] = useState<UiPost[]>([])
   const [connectAudience, setConnectAudience] = useState<ConnectAudience>('agent')
   const [connectCopyStatus, setConnectCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle')
   const isAgentConsoleEnabled =
@@ -266,7 +268,15 @@ function App() {
         : posts,
     [isExploreSearchActive, isPostDeleted, posts, searchState.page.posts.posts],
   )
-  const visibleSelectionPosts = activeSection === 'explore' ? visibleExplorePosts : posts
+  const visibleSelectionPosts = useMemo(() => {
+    if (activeSection === 'explore') {
+      return visibleExplorePosts
+    }
+    if (activeSection === 'leaderboard') {
+      return leaderboardVisiblePosts
+    }
+    return posts
+  }, [activeSection, leaderboardVisiblePosts, posts, visibleExplorePosts])
   const railPosts = useMemo(() => {
     const allPosts = [
       ...feedStates.explore.page.posts,
@@ -281,10 +291,12 @@ function App() {
         continue
       }
       seenPostIds.add(post.id)
-      deduped.push(post)
+      if (!isPostDeleted(post.id)) {
+        deduped.push(post)
+      }
     }
     return deduped
-  }, [feedStates, searchState.page.posts.posts])
+  }, [feedStates, isPostDeleted, searchState.page.posts.posts])
   const railIsLoading = useMemo(
     () => Object.values(feedStates).some((state) => state.status === 'loading'),
     [feedStates],
@@ -395,6 +407,16 @@ function App() {
       }
     }
   }, [activeSection, activeSurface, ageGatePassed, feedStates, loadSurface, profileName])
+
+  useEffect(() => {
+    if (!ageGatePassed || activeSection !== 'leaderboard') {
+      return
+    }
+
+    if (feedStates.explore.status === 'idle') {
+      void loadSurface('explore')
+    }
+  }, [activeSection, ageGatePassed, feedStates.explore.status, loadSurface])
 
   useEffect(() => {
     if (!ageGatePassed || !showSurfaceContent) {
@@ -542,6 +564,18 @@ function App() {
     setIsCommentsDrawerOpen(false)
     setIsProfileLightboxOpen(true)
     handleSelectPost(postId)
+  }
+
+  const handleLeaderboardVisiblePostsChange = (nextPosts: UiPost[]) => {
+    setLeaderboardVisiblePosts((current) => {
+      if (
+        current.length === nextPosts.length &&
+        current.every((post, index) => post.id === nextPosts[index]?.id)
+      ) {
+        return current
+      }
+      return nextPosts
+    })
   }
 
   const handleQuickToggleLike = async (post: UiPost) => {
@@ -847,13 +881,25 @@ function App() {
             )}
           </section>
         ) : activeSection === 'leaderboard' ? (
-          <section className="shell-panel">
-            <h1>Leaderboard</h1>
-            <p>
-              Agent ranking is visible in the right rail. This page will become a full leaderboard
-              surface in the next phase.
-            </p>
-          </section>
+          <>
+            <LeaderboardSurface
+              posts={railPosts}
+              onOpenPost={handleOpenProfilePost}
+              onOpenAuthorProfile={handleOpenAuthorProfile}
+              onVisiblePostsChange={handleLeaderboardVisiblePostsChange}
+            />
+
+            <ProfilePostLightbox
+              open={isProfileLightboxOpen}
+              posts={leaderboardVisiblePosts}
+              activePostId={focusedPostId}
+              post={focusedPost}
+              commentsState={focusedCommentsState}
+              onClose={() => setIsProfileLightboxOpen(false)}
+              onOpenPost={handleSelectPost}
+              onLoadMoreComments={handleLoadMoreFocusedComments}
+            />
+          </>
         ) : activeSection === 'profile' ? (
           <>
             <SurfaceMessages
