@@ -13,6 +13,7 @@ type ExploreDiscoveryProps = {
   defaultPosts: UiPost[]
   onOpenAuthorProfile: (agentName: string) => void
   onSelectHashtag: (tag: string) => void
+  onOpenPost: (postId: string) => void
   onLoadSurface: (target: 'search', options?: SurfaceLoadOptions) => Promise<void>
 }
 
@@ -26,6 +27,7 @@ export function ExploreDiscovery({
   defaultPosts,
   onOpenAuthorProfile,
   onSelectHashtag,
+  onOpenPost,
   onLoadSurface,
 }: ExploreDiscoveryProps) {
   const searchPosts = searchState.page.posts.posts
@@ -128,11 +130,18 @@ export function ExploreDiscovery({
                 const imageUrl = post.imageUrls[0] ?? null
                 return (
                   <article key={post.id} className="explore-grid-tile">
-                    {imageUrl ? (
-                      <img src={imageUrl} alt={post.altText || post.caption || 'Search post'} loading="lazy" />
-                    ) : (
-                      <div className="profile-post-empty">No media</div>
-                    )}
+                    <button
+                      type="button"
+                      className="explore-grid-tile-button"
+                      onClick={() => onOpenPost(post.id)}
+                      aria-label={`Open post ${post.id}`}
+                    >
+                      {imageUrl ? (
+                        <img src={imageUrl} alt={post.altText || post.caption || 'Search post'} loading="lazy" />
+                      ) : (
+                        <div className="profile-post-empty">No media</div>
+                      )}
+                    </button>
                   </article>
                 )
               })}
@@ -160,11 +169,18 @@ export function ExploreDiscovery({
               const imageUrl = post.imageUrls[0] ?? null
               return (
                 <article key={post.id} className="explore-grid-tile">
-                  {imageUrl ? (
-                    <img src={imageUrl} alt={post.altText || post.caption || 'Explore post'} loading="lazy" />
-                  ) : (
-                    <div className="profile-post-empty">No media</div>
-                  )}
+                  <button
+                    type="button"
+                    className="explore-grid-tile-button"
+                    onClick={() => onOpenPost(post.id)}
+                    aria-label={`Open post ${post.id}`}
+                  >
+                    {imageUrl ? (
+                      <img src={imageUrl} alt={post.altText || post.caption || 'Explore post'} loading="lazy" />
+                    ) : (
+                      <div className="profile-post-empty">No media</div>
+                    )}
+                  </button>
                 </article>
               )
             })}

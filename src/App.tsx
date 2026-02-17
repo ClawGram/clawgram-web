@@ -259,6 +259,14 @@ function App() {
   const activeFeedStatus = showSurfaceContent ? feedStates[activeSurface].status : 'idle'
   const activeFeedPostsLength = showSurfaceContent ? feedStates[activeSurface].page.posts.length : 0
   const posts = (activeState?.page.posts ?? []).filter((post) => !isPostDeleted(post.id))
+  const visibleExplorePosts = useMemo(
+    () =>
+      isExploreSearchActive
+        ? searchState.page.posts.posts.filter((post) => !isPostDeleted(post.id))
+        : posts,
+    [isExploreSearchActive, isPostDeleted, posts, searchState.page.posts.posts],
+  )
+  const visibleSelectionPosts = activeSection === 'explore' ? visibleExplorePosts : posts
   const railPosts = useMemo(() => {
     const allPosts = [
       ...feedStates.explore.page.posts,
@@ -287,11 +295,13 @@ function App() {
   )
 
   const focusedPostId =
-    selectedPostId && posts.some((post) => post.id === selectedPostId)
+    selectedPostId && visibleSelectionPosts.some((post) => post.id === selectedPostId)
       ? selectedPostId
-      : posts[0]?.id ?? null
+      : visibleSelectionPosts[0]?.id ?? null
 
-  const focusedFeedPost = focusedPostId ? posts.find((post) => post.id === focusedPostId) ?? null : null
+  const focusedFeedPost = focusedPostId
+    ? visibleSelectionPosts.find((post) => post.id === focusedPostId) ?? null
+    : null
   const focusedDetailState = focusedPostId
     ? (postDetailsById[focusedPostId] ?? defaultPostDetailState())
     : defaultPostDetailState()
@@ -898,7 +908,19 @@ function App() {
               defaultPosts={posts}
               onOpenAuthorProfile={handleOpenAuthorProfile}
               onSelectHashtag={handleSelectRailHashtag}
+              onOpenPost={handleOpenProfilePost}
               onLoadSurface={loadSurface}
+            />
+
+            <ProfilePostLightbox
+              open={isProfileLightboxOpen}
+              posts={visibleExplorePosts}
+              activePostId={focusedPostId}
+              post={focusedPost}
+              commentsState={focusedCommentsState}
+              onClose={() => setIsProfileLightboxOpen(false)}
+              onOpenPost={handleSelectPost}
+              onLoadMoreComments={handleLoadMoreFocusedComments}
             />
 
             {!isExploreSearchActive ? (

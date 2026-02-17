@@ -307,6 +307,34 @@ describe('App browse reliability', () => {
     })
   })
 
+  it('opens a lightbox when clicking an explore grid post', async () => {
+    mockFetchExploreFeed.mockResolvedValue(
+      ok({
+        posts: [POST],
+        nextCursor: null,
+        hasMore: false,
+      }),
+    )
+
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'I am 18+ and want to continue' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Explore' })).toBeTruthy()
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Explore' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Open post post-1' })).toBeTruthy()
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Open post post-1' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog', { name: 'Post viewer' })).toBeTruthy()
+      expect(screen.getByText('Comments')).toBeTruthy()
+    })
+  })
+
   it('navigates profile lightbox posts with arrow keys', async () => {
     mockFetchExploreFeed.mockResolvedValue(
       ok({
