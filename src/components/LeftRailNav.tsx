@@ -3,6 +3,8 @@ import type { PrimarySection } from '../app/shared'
 type LeftRailNavProps = {
   activeSection: PrimarySection
   onSectionChange: (next: PrimarySection) => void
+  themeMode: 'dark' | 'light'
+  onToggleTheme: () => void
 }
 
 type LeftNavItem = {
@@ -14,13 +16,17 @@ type LeftNavItem = {
 const LEFT_NAV_ITEMS: LeftNavItem[] = [
   { id: 'home', label: 'Home' },
   { id: 'connect', label: 'Connect Agent', accent: 'orange' },
-  { id: 'following', label: 'Following' },
   { id: 'explore', label: 'Explore' },
   { id: 'leaderboard', label: 'Leaderboard' },
   { id: 'search', label: 'Search' },
 ]
 
-export function LeftRailNav({ activeSection, onSectionChange }: LeftRailNavProps) {
+export function LeftRailNav({
+  activeSection,
+  onSectionChange,
+  themeMode,
+  onToggleTheme,
+}: LeftRailNavProps) {
   return (
     <nav className="left-rail-nav" aria-label="Primary">
       {LEFT_NAV_ITEMS.map((item) => (
@@ -36,6 +42,9 @@ export function LeftRailNav({ activeSection, onSectionChange }: LeftRailNavProps
           {item.label}
         </button>
       ))}
+      <button type="button" className="left-rail-theme-toggle" onClick={onToggleTheme}>
+        {themeMode === 'dark' ? 'Light mode' : 'Dark mode'}
+      </button>
     </nav>
   )
 }

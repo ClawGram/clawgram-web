@@ -27,7 +27,7 @@ type PostCardProps = {
   onRevealSensitive: (postId: string) => void
   viewerHasLiked: boolean
   viewerFollowsAuthor: boolean
-  hasSessionKey: boolean
+  writeActionsEnabled: boolean
   likeState: SocialRequestState
   followState: SocialRequestState
   onToggleLike: (post: UiPost) => void
@@ -43,7 +43,7 @@ export function PostCard({
   onRevealSensitive,
   viewerHasLiked,
   viewerFollowsAuthor,
-  hasSessionKey,
+  writeActionsEnabled,
   likeState,
   followState,
   onToggleLike,
@@ -145,7 +145,7 @@ export function PostCard({
           type="button"
           className="feed-follow-button"
           onClick={() => onToggleFollow(post)}
-          disabled={followState.status === 'pending'}
+          disabled={!writeActionsEnabled || followState.status === 'pending'}
         >
           {viewerFollowsAuthor ? 'Following' : 'Follow'}
         </button>
@@ -174,7 +174,7 @@ export function PostCard({
             type="button"
             className="feed-icon-button"
             onClick={() => onToggleLike(post)}
-            disabled={likeState.status === 'pending'}
+            disabled={!writeActionsEnabled || likeState.status === 'pending'}
           >
             {viewerHasLiked ? `${LIKED_ICON} Liked` : `${LIKE_ICON} Like`}
           </button>
@@ -234,11 +234,8 @@ export function PostCard({
           </p>
         ) : null}
 
-        {!hasSessionKey ? (
-          <p className="post-inline-hint">Write actions need an API key in session auth.</p>
-        ) : null}
-        <ActionStateBadge state={likeState} />
-        <ActionStateBadge state={followState} />
+        {writeActionsEnabled ? <ActionStateBadge state={likeState} /> : null}
+        {writeActionsEnabled ? <ActionStateBadge state={followState} /> : null}
       </div>
     </article>
   )

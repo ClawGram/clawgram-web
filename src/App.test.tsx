@@ -1,10 +1,9 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UiPost } from './api/adapters'
 import {
   fetchCommentReplies,
   fetchExploreFeed,
-  fetchFollowingFeed,
   fetchHashtagFeed,
   fetchPost,
   fetchPostComments,
@@ -19,7 +18,6 @@ const COMMENTS_BUTTON_LABEL = '\u{1F4AC} Comments'
 vi.mock('./api/adapters', () => ({
   fetchCommentReplies: vi.fn(),
   fetchExploreFeed: vi.fn(),
-  fetchFollowingFeed: vi.fn(),
   fetchHashtagFeed: vi.fn(),
   fetchPost: vi.fn(),
   fetchPostComments: vi.fn(),
@@ -33,7 +31,6 @@ vi.mock('./social/useSocialInteractions', () => ({
 
 const mockFetchCommentReplies = vi.mocked(fetchCommentReplies)
 const mockFetchExploreFeed = vi.mocked(fetchExploreFeed)
-const mockFetchFollowingFeed = vi.mocked(fetchFollowingFeed)
 const mockFetchHashtagFeed = vi.mocked(fetchHashtagFeed)
 const mockFetchPost = vi.mocked(fetchPost)
 const mockFetchPostComments = vi.mocked(fetchPostComments)
@@ -111,7 +108,6 @@ describe('App browse reliability', () => {
     window.history.replaceState({}, '', '/')
     mockFetchCommentReplies.mockReset()
     mockFetchExploreFeed.mockReset()
-    mockFetchFollowingFeed.mockReset()
     mockFetchHashtagFeed.mockReset()
     mockFetchPost.mockReset()
     mockFetchPostComments.mockReset()
@@ -206,31 +202,6 @@ describe('App browse reliability', () => {
     })
   })
 
-  it('shows mapped invalid_api_key error for following feed', async () => {
-    mockFetchExploreFeed.mockResolvedValue(ok({ posts: [], nextCursor: null, hasMore: false }))
-    mockFetchFollowingFeed.mockResolvedValue({
-      ok: false,
-      status: 401,
-      code: 'invalid_api_key',
-      hint: null,
-      requestId: 'req-invalid-key',
-      error: 'Invalid API key.',
-    })
-
-    render(<App />)
-    fireEvent.click(screen.getByRole('button', { name: 'I am 18+ and want to continue' }))
-
-    await waitFor(() => {
-      expect(screen.getByText('No posts returned for explore.')).toBeTruthy()
-    })
-
-    fireEvent.click(screen.getByRole('button', { name: 'Following' }))
-
-    await waitFor(() => {
-      expect(screen.getByText('Following feed requires a valid API key.')).toBeTruthy()
-    })
-  })
-
   it('hydrates from /connect route and updates pathname when navigating home', async () => {
     window.history.replaceState({}, '', '/connect')
 
@@ -239,6 +210,9 @@ describe('App browse reliability', () => {
     fireEvent.click(screen.getByRole('button', { name: 'I am 18+ and want to continue' }))
 
     expect(screen.getByText('Connect your agent')).toBeTruthy()
+    expect(screen.getByText(/curl -X POST/i)).toBeTruthy()
+    const primaryNav = screen.getByRole('navigation', { name: 'Primary' })
+    expect(within(primaryNav).queryByRole('button', { name: 'Following' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Home' }))
 
     await waitFor(() => {

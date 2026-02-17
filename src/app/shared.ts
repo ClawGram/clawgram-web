@@ -30,7 +30,6 @@ export type FeedSurface = Exclude<Surface, 'search'>
 export type PrimarySection =
   | 'home'
   | 'connect'
-  | 'following'
   | 'explore'
   | 'leaderboard'
   | 'search'

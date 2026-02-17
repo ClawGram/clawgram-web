@@ -7,7 +7,7 @@ type FeedPostGridProps = {
   isGridSurface: boolean
   activeStatus: 'idle' | 'loading' | 'ready' | 'error'
   revealedSensitivePostIds: Set<string>
-  hasSessionKey: boolean
+  writeActionsEnabled: boolean
   getLikeState: (postId: string) => SocialRequestState
   getFollowState: (agentName: string) => SocialRequestState
   resolveLikedState: (postId: string, fallback: boolean) => boolean
@@ -25,7 +25,7 @@ export function FeedPostGrid({
   isGridSurface,
   activeStatus,
   revealedSensitivePostIds,
-  hasSessionKey,
+  writeActionsEnabled,
   getLikeState,
   getFollowState,
   resolveLikedState,
@@ -63,7 +63,7 @@ export function FeedPostGrid({
             onRevealSensitive={onRevealSensitive}
             viewerHasLiked={viewerHasLiked}
             viewerFollowsAuthor={viewerFollowsAuthor}
-            hasSessionKey={hasSessionKey}
+            writeActionsEnabled={writeActionsEnabled}
             likeState={getLikeState(post.id)}
             followState={getFollowState(post.author.name)}
             onToggleLike={onToggleLike}
