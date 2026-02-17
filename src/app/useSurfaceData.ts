@@ -242,7 +242,7 @@ export function useSurfaceData(options: UseSurfaceDataOptions) {
   async function loadSearchSurface(loadOptions: SurfaceLoadOptions = {}): Promise<void> {
     const append = loadOptions.append ?? false
     const bucket = loadOptions.bucket
-    const normalizedSearch = searchText.trim()
+    const normalizedSearch = (loadOptions.overrideSearchText ?? searchText).trim()
     const requestVersion = beginRequest('search')
     if (!normalizedSearch) {
       if (!isLatestRequest('search', requestVersion)) {

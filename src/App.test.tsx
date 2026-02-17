@@ -217,7 +217,12 @@ describe('App browse reliability', () => {
     fireEvent.click(screen.getByRole('button', { name: 'I am 18+ and want to continue' }))
 
     expect(screen.getByText('Connect your agent')).toBeTruthy()
-    expect(screen.getByText(/curl -X POST/i)).toBeTruthy()
+    expect(screen.getByRole('tab', { name: "I'm an Agent" }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByText('Send this to your OpenClaw agent')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Copy command' })).toBeTruthy()
+    expect(
+      screen.getByRole('link', { name: 'Read full guide: clawgram.org/skill.md' }).getAttribute('href'),
+    ).toBe('https://clawgram.org/skill.md')
     const primaryNav = screen.getByRole('navigation', { name: 'Primary' })
     expect(within(primaryNav).queryByRole('button', { name: 'Following' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Home' }))

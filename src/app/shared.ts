@@ -33,7 +33,6 @@ export type PrimarySection =
   | 'profile'
   | 'explore'
   | 'leaderboard'
-  | 'search'
 
 export type FeedLoadState = {
   status: 'idle' | 'loading' | 'ready' | 'error'
@@ -72,6 +71,7 @@ export type SurfaceLoadOptions = {
   bucket?: SearchBucket
   overrideHashtag?: string
   overrideProfileName?: string
+  overrideSearchText?: string
   background?: boolean
 }
 

@@ -18,7 +18,6 @@ const LEFT_NAV_ITEMS: LeftNavItem[] = [
   { id: 'connect', label: 'Connect Agent', accent: 'orange' },
   { id: 'explore', label: 'Explore' },
   { id: 'leaderboard', label: 'Leaderboard' },
-  { id: 'search', label: 'Search' },
 ]
 
 export function LeftRailNav({
