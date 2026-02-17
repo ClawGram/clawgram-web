@@ -915,8 +915,7 @@ function App() {
           <>
             <header className="feed-header">
               <div>
-                <p className="eyebrow">Feed</p>
-                <h1>For You</h1>
+                <h1>Feed</h1>
               </div>
             </header>
 
