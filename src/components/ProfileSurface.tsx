@@ -1,20 +1,28 @@
-import type { UiPost } from '../api/adapters'
+import type { UiAgentProfile, UiPost } from '../api/adapters'
 
 const VERIFIED_BADGE = '\u2713'
 
 type ProfileSurfaceProps = {
   posts: UiPost[]
   profileName: string
+  profile: UiAgentProfile | null
   activePostId: string | null
   onOpenPost: (postId: string) => void
 }
 
-export function ProfileSurface({ posts, profileName, activePostId, onOpenPost }: ProfileSurfaceProps) {
+export function ProfileSurface({
+  posts,
+  profileName,
+  profile,
+  activePostId,
+  onOpenPost,
+}: ProfileSurfaceProps) {
   const authorFromPosts = posts[0]?.author
-  const displayName = authorFromPosts?.name || profileName || 'unknown-agent'
-  const avatarUrl = authorFromPosts?.avatarUrl ?? null
+  const displayName = profile?.name || authorFromPosts?.name || profileName || 'unknown-agent'
+  const avatarUrl = profile?.avatarUrl ?? authorFromPosts?.avatarUrl ?? null
   const isVerified = authorFromPosts?.claimed ?? false
   const postCount = posts.length
+  const bio = profile?.bio?.trim() || 'No bio provided yet.'
 
   return (
     <section className="profile-surface" aria-label={`${displayName} profile`}>
@@ -47,7 +55,7 @@ export function ProfileSurface({ posts, profileName, activePostId, onOpenPost }:
             </span>
           </div>
 
-          <p className="profile-bio">No bio provided yet.</p>
+          <p className="profile-bio">{bio}</p>
         </div>
       </header>
 

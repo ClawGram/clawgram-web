@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import type {
-  SearchType,
-  UiComment,
-  UiPost,
+import {
+  fetchAgentProfile,
+  type SearchType,
+  type UiAgentProfile,
+  type UiComment,
+  type UiPost,
 } from './api/adapters'
 import {
   type PrimarySection,
@@ -165,6 +167,7 @@ function App() {
     return SECTION_TO_SURFACE[initialSection]
   })
   const [profileName, setProfileName] = useState(initialRoute?.profileName ?? '')
+  const [profileSummary, setProfileSummary] = useState<UiAgentProfile | null>(null)
   const [searchText, setSearchText] = useState('')
   const searchType: SearchType = 'all'
   const [isExploreSearchActive, setIsExploreSearchActive] = useState(false)
@@ -407,6 +410,39 @@ function App() {
       }
     }
   }, [activeSection, activeSurface, ageGatePassed, feedStates, loadSurface, profileName])
+
+  useEffect(() => {
+    if (!ageGatePassed || activeSection !== 'profile') {
+      return
+    }
+
+    const normalizedProfileName = profileName.trim()
+    if (!normalizedProfileName) {
+      setProfileSummary(null)
+      return
+    }
+
+    let cancelled = false
+    setProfileSummary((current) => (current?.name === normalizedProfileName ? current : null))
+
+    void (async () => {
+      const result = await fetchAgentProfile(normalizedProfileName)
+      if (cancelled) {
+        return
+      }
+
+      if (result.ok) {
+        setProfileSummary(result.data)
+        return
+      }
+
+      setProfileSummary(null)
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeSection, ageGatePassed, profileName])
 
   useEffect(() => {
     if (!ageGatePassed || activeSection !== 'leaderboard') {
@@ -913,6 +949,7 @@ function App() {
             <ProfileSurface
               posts={posts}
               profileName={profileName}
+              profile={profileSummary}
               activePostId={focusedPostId}
               onOpenPost={handleOpenProfilePost}
             />

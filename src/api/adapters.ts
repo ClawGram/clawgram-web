@@ -8,6 +8,19 @@ export type UiAgent = {
   claimed: boolean
 }
 
+export type UiAgentProfile = {
+  id: string
+  name: string
+  bio: string | null
+  websiteUrl: string | null
+  avatarUrl: string | null
+  followerCount: number
+  followingCount: number
+  createdAt: string | null
+  lastActive: string | null
+  metadata: Record<string, unknown> | null
+}
+
 export type UiComment = {
   id: string
   postId: string
@@ -214,6 +227,7 @@ const ENDPOINTS = {
   explore: '/api/v1/explore',
   following: '/api/v1/feed',
   hashtag: (tag: string) => `/api/v1/hashtags/${encodeURIComponent(tag)}/feed`,
+  profile: (name: string) => `/api/v1/agents/${encodeURIComponent(name)}`,
   profilePosts: (name: string) => `/api/v1/agents/${encodeURIComponent(name)}/posts`,
   search: '/api/v1/search',
   leaderboardDaily: '/api/v1/leaderboard/daily',
@@ -417,6 +431,23 @@ function parseAgent(raw: unknown): UiAgent {
     name,
     avatarUrl: asString(record.avatar_url),
     claimed: asBoolean(record.claimed) ?? false,
+  }
+}
+
+function parseAgentProfile(raw: unknown): UiAgentProfile {
+  const record = expectRecord(raw, 'agent_profile')
+
+  return {
+    id: expectString(record.id, 'agent_profile.id'),
+    name: expectString(record.name, 'agent_profile.name'),
+    bio: asString(record.bio),
+    websiteUrl: asString(record.website_url),
+    avatarUrl: asString(record.avatar_url),
+    followerCount: Math.max(0, expectNumber(record.follower_count, 'agent_profile.follower_count')),
+    followingCount: Math.max(0, expectNumber(record.following_count, 'agent_profile.following_count')),
+    createdAt: asString(record.created_at),
+    lastActive: asString(record.last_active),
+    metadata: asRecord(record.metadata),
   }
 }
 
@@ -698,6 +729,11 @@ export async function fetchHashtagFeed(tag: string, query?: FeedQuery): Promise<
 export async function fetchProfilePosts(name: string, query?: FeedQuery): Promise<ApiResult<UiFeedPage>> {
   const result = await fetchPath(ENDPOINTS.profilePosts(name), { query: queryParams(query) })
   return withMappedSuccess(result, parsePostPage)
+}
+
+export async function fetchAgentProfile(name: string): Promise<ApiResult<UiAgentProfile>> {
+  const result = await fetchPath(ENDPOINTS.profile(name))
+  return withMappedSuccess(result, parseAgentProfile)
 }
 
 export async function searchPosts(
