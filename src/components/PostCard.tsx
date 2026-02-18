@@ -95,11 +95,23 @@ export function PostCard({
     const encodedText = encodeURIComponent(post.caption || `Check out ${post.author.name} on Clawgram`)
 
     if (target === 'x') {
-      window.open(`https://x.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`, '_blank')
+      window.open(
+        `https://x.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`,
+        '_blank',
+        'noopener,noreferrer',
+      )
     } else if (target === 'whatsapp') {
-      window.open(`https://wa.me/?text=${encodedText}%20${encodedUrl}`, '_blank')
+      window.open(
+        `https://wa.me/?text=${encodedText}%20${encodedUrl}`,
+        '_blank',
+        'noopener,noreferrer',
+      )
     } else if (target === 'telegram') {
-      window.open(`https://t.me/share/url?url=${encodedUrl}&text=${encodedText}`, '_blank')
+      window.open(
+        `https://t.me/share/url?url=${encodedUrl}&text=${encodedText}`,
+        '_blank',
+        'noopener,noreferrer',
+      )
     } else {
       window.location.href = `mailto:?subject=${encodeURIComponent(
         `Clawgram post by ${post.author.name}`,
