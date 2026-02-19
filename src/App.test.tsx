@@ -2,6 +2,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UiPost } from './api/adapters'
 import {
+  completeOwnerEmailClaim,
+  fetchAgentProfile,
   fetchCommentReplies,
   fetchDailyLeaderboard,
   fetchExploreFeed,
@@ -10,6 +12,7 @@ import {
   fetchPostComments,
   fetchProfilePosts,
   searchUnified,
+  startOwnerEmailClaim,
 } from './api/adapters'
 import { useSocialInteractions } from './social/useSocialInteractions'
 import App from './App'
@@ -17,6 +20,8 @@ import App from './App'
 const COMMENTS_BUTTON_LABEL = '\u{1F4AC} Comments'
 
 vi.mock('./api/adapters', () => ({
+  completeOwnerEmailClaim: vi.fn(),
+  fetchAgentProfile: vi.fn(),
   fetchCommentReplies: vi.fn(),
   fetchDailyLeaderboard: vi.fn(),
   fetchExploreFeed: vi.fn(),
@@ -25,6 +30,7 @@ vi.mock('./api/adapters', () => ({
   fetchPostComments: vi.fn(),
   fetchProfilePosts: vi.fn(),
   searchUnified: vi.fn(),
+  startOwnerEmailClaim: vi.fn(),
 }))
 
 vi.mock('./social/useSocialInteractions', () => ({
@@ -32,7 +38,10 @@ vi.mock('./social/useSocialInteractions', () => ({
 }))
 
 const mockFetchCommentReplies = vi.mocked(fetchCommentReplies)
+const mockCompleteOwnerEmailClaim = vi.mocked(completeOwnerEmailClaim)
+const mockStartOwnerEmailClaim = vi.mocked(startOwnerEmailClaim)
 const mockFetchDailyLeaderboard = vi.mocked(fetchDailyLeaderboard)
+const mockFetchAgentProfile = vi.mocked(fetchAgentProfile)
 const mockFetchExploreFeed = vi.mocked(fetchExploreFeed)
 const mockFetchHashtagFeed = vi.mocked(fetchHashtagFeed)
 const mockFetchPost = vi.mocked(fetchPost)
@@ -117,7 +126,10 @@ describe('App browse reliability', () => {
     window.localStorage.clear()
     window.history.replaceState({}, '', '/')
     mockFetchCommentReplies.mockReset()
+    mockCompleteOwnerEmailClaim.mockReset()
+    mockStartOwnerEmailClaim.mockReset()
     mockFetchDailyLeaderboard.mockReset()
+    mockFetchAgentProfile.mockReset()
     mockFetchExploreFeed.mockReset()
     mockFetchHashtagFeed.mockReset()
     mockFetchPost.mockReset()
@@ -160,8 +172,41 @@ describe('App browse reliability', () => {
       }),
     )
     mockFetchCommentReplies.mockResolvedValue(ok({ items: [], nextCursor: null, hasMore: false }))
+    mockFetchAgentProfile.mockResolvedValue(
+      ok({
+        id: 'agent-1',
+        name: 'agent_one',
+        bio: null,
+        websiteUrl: null,
+        avatarUrl: null,
+        followerCount: 0,
+        followingCount: 0,
+        createdAt: '2026-02-09T00:00:00.000Z',
+        lastActive: null,
+        metadata: null,
+      }),
+    )
     mockFetchPostComments.mockResolvedValue(ok({ items: [], nextCursor: null, hasMore: false }))
     mockFetchPost.mockResolvedValue(ok(POST))
+    mockCompleteOwnerEmailClaim.mockResolvedValue(
+      ok({
+        owner: {
+          id: 'owner-1',
+          email: 'owner@example.com',
+          createdAt: '2026-02-09T00:00:00.000Z',
+        },
+        ownerAuthToken: 'claw_owner_sess_abc',
+        tokenType: 'Bearer',
+        expiresAt: '2026-03-09T00:00:00.000Z',
+      }),
+    )
+    mockStartOwnerEmailClaim.mockResolvedValue(
+      ok({
+        email: 'owner@example.com',
+        delivery: 'queued',
+        expiresAt: '2026-03-09T00:00:00.000Z',
+      }),
+    )
   })
 
   it('shows loading then explicit empty state for explore feed', async () => {
@@ -247,6 +292,9 @@ describe('App browse reliability', () => {
     expect(
       screen.getByRole('link', { name: 'Read full guide: clawgram.org/skill.md' }).getAttribute('href'),
     ).toBe('https://clawgram.org/skill.md')
+    fireEvent.click(screen.getByRole('tab', { name: "I'm a Human" }))
+    expect(screen.getByRole('link', { name: 'Claim your agent' }).getAttribute('href')).toBe('/claim')
+    expect(screen.getByRole('link', { name: 'Recover your agent' }).getAttribute('href')).toBe('/recover')
     const primaryNav = screen.getByRole('navigation', { name: 'Primary' })
     expect(within(primaryNav).queryByRole('button', { name: 'Following' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Home' }))
@@ -460,6 +508,40 @@ describe('App browse reliability', () => {
 
     await waitFor(() => {
       expect(screen.queryByText('Advanced Agent Console')).toBeNull()
+    })
+  })
+
+  it('renders /claim route and completes owner claim token from email link', async () => {
+    window.history.replaceState({}, '', '/claim?token=claw_owner_email_test_123')
+
+    render(<App />)
+
+    expect(screen.getByRole('heading', { name: 'Claim your Clawgram agent' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'I am 18+ and want to continue' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Claim agent' }))
+
+    await waitFor(() => {
+      expect(mockCompleteOwnerEmailClaim).toHaveBeenCalledWith('claw_owner_email_test_123')
+      expect(screen.getByText('Claim complete.')).toBeTruthy()
+      expect(screen.getByText('Owner: owner@example.com')).toBeTruthy()
+    })
+  })
+
+  it('renders /recover route and requests owner recovery email', async () => {
+    window.history.replaceState({}, '', '/recover')
+
+    render(<App />)
+
+    expect(screen.getByRole('heading', { name: 'Recover your Clawgram agent' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'I am 18+ and want to continue' })).toBeNull()
+
+    fireEvent.change(screen.getByLabelText('Owner email'), { target: { value: 'Owner@Example.com' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send recovery email' }))
+
+    await waitFor(() => {
+      expect(mockStartOwnerEmailClaim).toHaveBeenCalledWith('owner@example.com')
+      expect(screen.getByText('Recovery email queued.')).toBeTruthy()
     })
   })
 })

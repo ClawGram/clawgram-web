@@ -156,6 +156,25 @@ export type UiLeaderboardEntry = {
   post: UiPost
 }
 
+export type UiOwnerProfile = {
+  id: string
+  email: string
+  createdAt: string | null
+}
+
+export type UiOwnerClaimCompletion = {
+  owner: UiOwnerProfile
+  ownerAuthToken: string
+  tokenType: 'Bearer'
+  expiresAt: string | null
+}
+
+export type UiOwnerEmailStart = {
+  email: string
+  delivery: 'queued'
+  expiresAt: string | null
+}
+
 export type UiDailyLeaderboard = {
   board: UiLeaderboardBoardType
   contestDateUtc: string
@@ -231,6 +250,8 @@ const ENDPOINTS = {
   profilePosts: (name: string) => `/api/v1/agents/${encodeURIComponent(name)}/posts`,
   search: '/api/v1/search',
   leaderboardDaily: '/api/v1/leaderboard/daily',
+  ownerEmailStart: '/api/v1/owner/email/start',
+  ownerEmailComplete: '/api/v1/owner/email/complete',
   posts: '/api/v1/posts',
   post: (postId: string) => `/api/v1/posts/${encodeURIComponent(postId)}`,
   postComments: (postId: string) => `/api/v1/posts/${encodeURIComponent(postId)}/comments`,
@@ -609,6 +630,40 @@ function parseDailyLeaderboard(payload: unknown): UiDailyLeaderboard {
   }
 }
 
+function parseOwnerClaimCompletion(payload: unknown): UiOwnerClaimCompletion {
+  const record = expectRecord(payload, 'owner_claim')
+  const ownerRecord = expectRecord(record.owner, 'owner_claim.owner')
+  const tokenType = expectString(record.token_type, 'owner_claim.token_type')
+  if (tokenType !== 'Bearer') {
+    throw new ContractValidationError('owner_claim.token_type must be "Bearer".')
+  }
+
+  return {
+    owner: {
+      id: expectString(ownerRecord.id, 'owner_claim.owner.id'),
+      email: expectString(ownerRecord.email, 'owner_claim.owner.email'),
+      createdAt: asString(ownerRecord.created_at),
+    },
+    ownerAuthToken: expectString(record.owner_auth_token, 'owner_claim.owner_auth_token'),
+    tokenType: 'Bearer',
+    expiresAt: asString(record.expires_at),
+  }
+}
+
+function parseOwnerEmailStart(payload: unknown): UiOwnerEmailStart {
+  const record = expectRecord(payload, 'owner_email_start')
+  const delivery = expectString(record.delivery, 'owner_email_start.delivery')
+  if (delivery !== 'queued') {
+    throw new ContractValidationError('owner_email_start.delivery must be "queued".')
+  }
+
+  return {
+    email: expectString(record.email, 'owner_email_start.email'),
+    delivery: 'queued',
+    expiresAt: asString(record.expires_at),
+  }
+}
+
 function emptySearchBucket<TItem>(): UiSearchBucketPage<TItem> {
   return {
     items: [],
@@ -854,6 +909,54 @@ export async function fetchDailyLeaderboard(
   })
 
   return withMappedSuccess(result, parseDailyLeaderboard)
+}
+
+export async function completeOwnerEmailClaim(token: string): Promise<ApiResult<UiOwnerClaimCompletion>> {
+  const normalizedToken = token.trim()
+  if (!normalizedToken) {
+    return {
+      ok: false,
+      status: 400,
+      error: 'Owner claim token is required.',
+      code: 'validation_error',
+      hint: 'Open the claim link from your email, or paste a valid token.',
+      requestId: null,
+    }
+  }
+
+  const result = await mutatePath(ENDPOINTS.ownerEmailComplete, {
+    method: 'POST',
+    body: {
+      token: normalizedToken,
+    },
+    idempotencyScope: 'owner-email-complete',
+  })
+
+  return withMappedSuccess(result, parseOwnerClaimCompletion)
+}
+
+export async function startOwnerEmailClaim(email: string): Promise<ApiResult<UiOwnerEmailStart>> {
+  const normalizedEmail = email.trim().toLowerCase()
+  if (!normalizedEmail) {
+    return {
+      ok: false,
+      status: 400,
+      error: 'Owner email is required.',
+      code: 'validation_error',
+      hint: 'Enter the email address that should own this agent.',
+      requestId: null,
+    }
+  }
+
+  const result = await mutatePath(ENDPOINTS.ownerEmailStart, {
+    method: 'POST',
+    body: {
+      email: normalizedEmail,
+    },
+    idempotencyScope: 'owner-email-start',
+  })
+
+  return withMappedSuccess(result, parseOwnerEmailStart)
 }
 
 export async function createPost(

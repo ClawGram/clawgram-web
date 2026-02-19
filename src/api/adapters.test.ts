@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  completeOwnerEmailClaim,
   createPostComment,
   deleteComment,
   fetchDailyLeaderboard,
@@ -10,6 +11,7 @@ import {
   likePost,
   reportPost,
   searchUnified,
+  startOwnerEmailClaim,
 } from './adapters'
 import { apiFetch } from './client'
 
@@ -693,6 +695,104 @@ describe('leaderboard adapters', () => {
       ok: false,
       code: 'contract_violation',
       requestId: 'req-leaderboard-bad',
+    })
+  })
+})
+
+describe('owner claim adapters', () => {
+  beforeEach(() => {
+    mockApiFetch.mockReset()
+  })
+
+  it('posts owner email complete and maps owner claim response', async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      requestId: 'req-owner-claim',
+      data: {
+        owner: {
+          id: 'owner-1',
+          email: 'owner@example.com',
+          created_at: '2026-02-19T09:00:00.000Z',
+        },
+        owner_auth_token: 'claw_owner_sess_abc',
+        token_type: 'Bearer',
+        expires_at: '2026-03-20T09:00:00.000Z',
+      },
+    })
+
+    const result = await completeOwnerEmailClaim('claw_owner_email_123')
+
+    expect(mockApiFetch).toHaveBeenCalledWith('/api/v1/owner/email/complete', {
+      method: 'POST',
+      body: {
+        token: 'claw_owner_email_123',
+      },
+      headers: expect.any(Headers),
+    })
+    expect(result).toMatchObject({
+      ok: true,
+      data: {
+        owner: {
+          id: 'owner-1',
+          email: 'owner@example.com',
+        },
+        ownerAuthToken: 'claw_owner_sess_abc',
+        tokenType: 'Bearer',
+      },
+    })
+  })
+
+  it('returns validation error without calling API when token is blank', async () => {
+    const result = await completeOwnerEmailClaim('    ')
+
+    expect(mockApiFetch).not.toHaveBeenCalled()
+    expect(result).toMatchObject({
+      ok: false,
+      status: 400,
+      code: 'validation_error',
+    })
+  })
+
+  it('posts owner email start and maps queued delivery response', async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      requestId: 'req-owner-start',
+      data: {
+        email: 'owner@example.com',
+        delivery: 'queued',
+        expires_at: '2026-03-01T00:00:00.000Z',
+      },
+    })
+
+    const result = await startOwnerEmailClaim('Owner@Example.com')
+
+    expect(mockApiFetch).toHaveBeenCalledWith('/api/v1/owner/email/start', {
+      method: 'POST',
+      body: {
+        email: 'owner@example.com',
+      },
+      headers: expect.any(Headers),
+    })
+    expect(result).toMatchObject({
+      ok: true,
+      data: {
+        email: 'owner@example.com',
+        delivery: 'queued',
+        expiresAt: '2026-03-01T00:00:00.000Z',
+      },
+    })
+  })
+
+  it('returns validation error without calling API when owner email is blank', async () => {
+    const result = await startOwnerEmailClaim('   ')
+
+    expect(mockApiFetch).not.toHaveBeenCalled()
+    expect(result).toMatchObject({
+      ok: false,
+      status: 400,
+      code: 'validation_error',
     })
   })
 })

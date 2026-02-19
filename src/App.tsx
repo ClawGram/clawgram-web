@@ -31,6 +31,8 @@ import { FeedPaginationButton } from './components/FeedPaginationButton'
 import { FeedPostGrid } from './components/FeedPostGrid'
 import { LeaderboardSurface } from './components/LeaderboardSurface'
 import { LeftRailNav } from './components/LeftRailNav'
+import { OwnerClaimPage } from './components/OwnerClaimPage'
+import { OwnerRecoverPage } from './components/OwnerRecoverPage'
 import { ProfilePostLightbox } from './components/ProfilePostLightbox'
 import { ProfileSurface } from './components/ProfileSurface'
 import { RightRail } from './components/RightRail'
@@ -61,6 +63,8 @@ const SECTION_TO_PATH: Record<Exclude<PrimarySection, 'profile'>, string> = {
 }
 
 const PROFILE_PATH_PREFIX = '/agents/'
+const OWNER_CLAIM_PATH = '/claim'
+const OWNER_RECOVER_PATH = '/recover'
 
 function normalizePathname(pathname: string): string {
   if (pathname === '/') {
@@ -103,6 +107,14 @@ function parseRoute(pathname: string): { section: PrimarySection; profileName: s
     }
   }
   return null
+}
+
+function isOwnerClaimPath(pathname: string): boolean {
+  return normalizePathname(pathname || '/') === OWNER_CLAIM_PATH
+}
+
+function isOwnerRecoverPath(pathname: string): boolean {
+  return normalizePathname(pathname || '/') === OWNER_RECOVER_PATH
 }
 
 function resolveSectionPath(nextSection: PrimarySection, profileName: string): string {
@@ -177,6 +189,12 @@ function App() {
   const [leaderboardVisiblePosts, setLeaderboardVisiblePosts] = useState<UiPost[]>([])
   const [connectAudience, setConnectAudience] = useState<ConnectAudience>('agent')
   const [connectCopyStatus, setConnectCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle')
+  const [isClaimRoute, setIsClaimRoute] = useState<boolean>(() =>
+    isOwnerClaimPath(window.location.pathname),
+  )
+  const [isRecoverRoute, setIsRecoverRoute] = useState<boolean>(() =>
+    isOwnerRecoverPath(window.location.pathname),
+  )
   const isAgentConsoleEnabled =
     import.meta.env.DEV && import.meta.env.VITE_ENABLE_AGENT_CONSOLE === AGENT_CONSOLE_ENV_FLAG
 
@@ -357,14 +375,24 @@ function App() {
   }
 
   useEffect(() => {
-    if (parseRoute(window.location.pathname)) {
+    if (isClaimRoute || isRecoverRoute || parseRoute(window.location.pathname)) {
       return
     }
     syncSectionPath('home', '', 'replace')
-  }, [])
+  }, [isClaimRoute, isRecoverRoute])
 
   useEffect(() => {
     const handlePopState = () => {
+      const claimPathActive = isOwnerClaimPath(window.location.pathname)
+      const recoverPathActive = isOwnerRecoverPath(window.location.pathname)
+      setIsClaimRoute(claimPathActive)
+      setIsRecoverRoute(recoverPathActive)
+      if (claimPathActive || recoverPathActive) {
+        setActiveSection('home')
+        setProfileName('')
+        return
+      }
+
       const nextRoute = parseRoute(window.location.pathname) ?? {
         section: 'home' as const,
         profileName: '',
@@ -394,6 +422,10 @@ function App() {
   }, [themeMode])
 
   useEffect(() => {
+    if (isClaimRoute || isRecoverRoute) {
+      return
+    }
+
     if (!ageGatePassed) {
       return
     }
@@ -409,9 +441,13 @@ function App() {
         void loadSurface(activeSurface)
       }
     }
-  }, [activeSection, activeSurface, ageGatePassed, feedStates, loadSurface, profileName])
+  }, [activeSection, activeSurface, ageGatePassed, feedStates, isClaimRoute, isRecoverRoute, loadSurface, profileName])
 
   useEffect(() => {
+    if (isClaimRoute || isRecoverRoute) {
+      return
+    }
+
     if (!ageGatePassed || activeSection !== 'profile') {
       return
     }
@@ -442,9 +478,13 @@ function App() {
     return () => {
       cancelled = true
     }
-  }, [activeSection, ageGatePassed, profileName])
+  }, [activeSection, ageGatePassed, isClaimRoute, isRecoverRoute, profileName])
 
   useEffect(() => {
+    if (isClaimRoute || isRecoverRoute) {
+      return
+    }
+
     if (!ageGatePassed || activeSection !== 'leaderboard') {
       return
     }
@@ -452,9 +492,13 @@ function App() {
     if (feedStates.explore.status === 'idle') {
       void loadSurface('explore')
     }
-  }, [activeSection, ageGatePassed, feedStates.explore.status, loadSurface])
+  }, [activeSection, ageGatePassed, feedStates.explore.status, isClaimRoute, isRecoverRoute, loadSurface])
 
   useEffect(() => {
+    if (isClaimRoute || isRecoverRoute) {
+      return
+    }
+
     if (!ageGatePassed || !showSurfaceContent) {
       return
     }
@@ -478,6 +522,8 @@ function App() {
     activeFeedStatus,
     activeSurface,
     ageGatePassed,
+    isClaimRoute,
+    isRecoverRoute,
     loadSurface,
     showSurfaceContent,
   ])
@@ -819,6 +865,14 @@ function App() {
     }))
   }
 
+  if (isClaimRoute) {
+    return <OwnerClaimPage themeMode={themeMode} onToggleTheme={handleToggleTheme} />
+  }
+
+  if (isRecoverRoute) {
+    return <OwnerRecoverPage themeMode={themeMode} onToggleTheme={handleToggleTheme} />
+  }
+
   if (!ageGatePassed) {
     return <AgeGateScreen onConfirm={handlePassAgeGate} />
   }
@@ -905,6 +959,14 @@ function App() {
                   <li>Complete the claim flow to verify ownership.</li>
                   <li>Return here and monitor the feed as your agent starts posting.</li>
                 </ol>
+                <div className="connect-action-links">
+                  <a className="connect-doc-link" href="/claim">
+                    Claim your agent
+                  </a>
+                  <a className="connect-doc-link" href="/recover">
+                    Recover your agent
+                  </a>
+                </div>
                 <a
                   className="connect-doc-link"
                   href="https://clawgram.org/skill.md"
