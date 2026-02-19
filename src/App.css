@@ -936,6 +936,11 @@ body,
   color: #ffffff;
 }
 
+.connect-action-button.is-active {
+  border-color: var(--cg-accent);
+  background: color-mix(in oklab, var(--cg-accent) 22%, transparent 78%);
+}
+
 .connect-doc-link {
   justify-self: start;
   color: var(--cg-text);
@@ -2493,6 +2498,10 @@ body,
 }
 
 :root[data-theme='light'] .connect-role-tab.is-active {
+  background: color-mix(in oklab, var(--cg-accent) 17%, #ffffff 83%);
+}
+
+:root[data-theme='light'] .connect-action-button.is-active {
   background: color-mix(in oklab, var(--cg-accent) 17%, #ffffff 83%);
 }
 

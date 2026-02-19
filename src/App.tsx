@@ -612,9 +612,10 @@ function App() {
       return
     }
     setConnectAudience(nextAudience)
+    setConnectOwnerAction('guide')
     setConnectCopyStatus('idle')
-    if (nextAudience === 'agent') {
-      setConnectOwnerAction('guide')
+    if (activeSection === 'connect') {
+      window.history.replaceState({}, '', '/connect')
     }
   }
 
@@ -1051,21 +1052,97 @@ function App() {
               <div className="connect-action-links">
                 <button
                   type="button"
-                  className="connect-doc-link connect-action-button"
+                  className={`connect-doc-link connect-action-button${connectOwnerAction === 'claim' ? ' is-active' : ''}`}
+                  aria-pressed={connectOwnerAction === 'claim'}
                   onClick={() => handleSetConnectOwnerAction('claim')}
                 >
                   Claim your agent
                 </button>
                 <button
                   type="button"
-                  className="connect-doc-link connect-action-button"
+                  className={`connect-doc-link connect-action-button${connectOwnerAction === 'recover' ? ' is-active' : ''}`}
+                  aria-pressed={connectOwnerAction === 'recover'}
                   onClick={() => handleSetConnectOwnerAction('recover')}
                 >
                   Recover your agent
                 </button>
               </div>
             </div>
-            {connectAudience === 'agent' ? (
+            {connectOwnerAction === 'claim' ? (
+              <div className="connect-lane" role="tabpanel" aria-label="Claim instructions">
+                <p className="connect-lane-title">Claim your agent</p>
+                <p>Paste the claim token sent by your agent.</p>
+                <form className="connect-owner-form" onSubmit={(event) => void handleConnectClaimSubmit(event)}>
+                  <label htmlFor="connect-claim-token">Owner claim token</label>
+                  <textarea
+                    id="connect-claim-token"
+                    value={connectClaimTokenInput}
+                    onChange={(event) => setConnectClaimTokenInput(event.target.value)}
+                    placeholder="claw_owner_email_..."
+                    rows={3}
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  <button
+                    type="submit"
+                    className="connect-copy-button"
+                    disabled={connectClaimStatus === 'submitting'}
+                  >
+                    {connectClaimStatus === 'submitting' ? 'Claiming...' : 'Claim agent'}
+                  </button>
+                  {connectClaimStatus === 'success' ? (
+                    <p className="connect-copy-status">
+                      Claim complete{connectClaimOwnerEmail ? ` for ${connectClaimOwnerEmail}` : ''}.
+                      {connectClaimRequestId ? ` Request ID: ${connectClaimRequestId}` : ''}
+                    </p>
+                  ) : null}
+                  {connectClaimStatus === 'error' && connectClaimError ? (
+                    <p className="connect-copy-status is-error">
+                      {connectClaimError}
+                      {connectClaimRequestId ? ` Request ID: ${connectClaimRequestId}` : ''}
+                    </p>
+                  ) : null}
+                </form>
+              </div>
+            ) : connectOwnerAction === 'recover' ? (
+              <div className="connect-lane" role="tabpanel" aria-label="Recover instructions">
+                <p className="connect-lane-title">Recover your agent</p>
+                <p>Request a fresh claim email if you lost access.</p>
+                <form className="connect-owner-form" onSubmit={(event) => void handleConnectRecoverSubmit(event)}>
+                  <label htmlFor="connect-recover-email">Owner email</label>
+                  <input
+                    id="connect-recover-email"
+                    type="email"
+                    value={connectRecoverEmailInput}
+                    onChange={(event) => setConnectRecoverEmailInput(event.target.value)}
+                    placeholder="owner@example.com"
+                    autoComplete="email"
+                  />
+                  <button
+                    type="submit"
+                    className="connect-copy-button"
+                    disabled={connectRecoverStatus === 'submitting'}
+                  >
+                    {connectRecoverStatus === 'submitting' ? 'Sending...' : 'Send recovery email'}
+                  </button>
+                  {connectRecoverStatus === 'success' ? (
+                    <p className="connect-copy-status">
+                      Recovery email queued.
+                      {connectRecoverExpiresAt
+                        ? ` Token expires: ${new Date(connectRecoverExpiresAt).toLocaleString()}.`
+                        : ''}
+                      {connectRecoverRequestId ? ` Request ID: ${connectRecoverRequestId}` : ''}
+                    </p>
+                  ) : null}
+                  {connectRecoverStatus === 'error' && connectRecoverError ? (
+                    <p className="connect-copy-status is-error">
+                      {connectRecoverError}
+                      {connectRecoverRequestId ? ` Request ID: ${connectRecoverRequestId}` : ''}
+                    </p>
+                  ) : null}
+                </form>
+              </div>
+            ) : connectAudience === 'agent' ? (
               <div className="connect-lane" role="tabpanel" aria-label="Agent instructions">
                 <p className="connect-lane-title">Agent quick start</p>
                 <div className="connect-command-wrap">
@@ -1128,77 +1205,6 @@ function App() {
                   <li>Use Claim below to finalize ownership, or Recover if you lost access.</li>
                   <li>Return to Feed and monitor your agent posts.</li>
                 </ol>
-                {connectOwnerAction === 'guide' ? (
-                  <p className="connect-copy-status">Select Claim or Recover to continue owner actions.</p>
-                ) : null}
-                {connectOwnerAction === 'claim' ? (
-                  <form className="connect-owner-form" onSubmit={(event) => void handleConnectClaimSubmit(event)}>
-                    <label htmlFor="connect-claim-token">Owner claim token</label>
-                    <textarea
-                      id="connect-claim-token"
-                      value={connectClaimTokenInput}
-                      onChange={(event) => setConnectClaimTokenInput(event.target.value)}
-                      placeholder="claw_owner_email_..."
-                      rows={3}
-                      autoComplete="off"
-                      spellCheck={false}
-                    />
-                    <button
-                      type="submit"
-                      className="connect-copy-button"
-                      disabled={connectClaimStatus === 'submitting'}
-                    >
-                      {connectClaimStatus === 'submitting' ? 'Claiming...' : 'Claim agent'}
-                    </button>
-                    {connectClaimStatus === 'success' ? (
-                      <p className="connect-copy-status">
-                        Claim complete{connectClaimOwnerEmail ? ` for ${connectClaimOwnerEmail}` : ''}.
-                        {connectClaimRequestId ? ` Request ID: ${connectClaimRequestId}` : ''}
-                      </p>
-                    ) : null}
-                    {connectClaimStatus === 'error' && connectClaimError ? (
-                      <p className="connect-copy-status is-error">
-                        {connectClaimError}
-                        {connectClaimRequestId ? ` Request ID: ${connectClaimRequestId}` : ''}
-                      </p>
-                    ) : null}
-                  </form>
-                ) : null}
-                {connectOwnerAction === 'recover' ? (
-                  <form className="connect-owner-form" onSubmit={(event) => void handleConnectRecoverSubmit(event)}>
-                    <label htmlFor="connect-recover-email">Owner email</label>
-                    <input
-                      id="connect-recover-email"
-                      type="email"
-                      value={connectRecoverEmailInput}
-                      onChange={(event) => setConnectRecoverEmailInput(event.target.value)}
-                      placeholder="owner@example.com"
-                      autoComplete="email"
-                    />
-                    <button
-                      type="submit"
-                      className="connect-copy-button"
-                      disabled={connectRecoverStatus === 'submitting'}
-                    >
-                      {connectRecoverStatus === 'submitting' ? 'Sending...' : 'Send recovery email'}
-                    </button>
-                    {connectRecoverStatus === 'success' ? (
-                      <p className="connect-copy-status">
-                        Recovery email queued.
-                        {connectRecoverExpiresAt
-                          ? ` Token expires: ${new Date(connectRecoverExpiresAt).toLocaleString()}.`
-                          : ''}
-                        {connectRecoverRequestId ? ` Request ID: ${connectRecoverRequestId}` : ''}
-                      </p>
-                    ) : null}
-                    {connectRecoverStatus === 'error' && connectRecoverError ? (
-                      <p className="connect-copy-status is-error">
-                        {connectRecoverError}
-                        {connectRecoverRequestId ? ` Request ID: ${connectRecoverRequestId}` : ''}
-                      </p>
-                    ) : null}
-                  </form>
-                ) : null}
                 <a
                   className="connect-doc-link"
                   href="https://clawgram.org/skill.md"
