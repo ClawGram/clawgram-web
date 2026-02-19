@@ -161,7 +161,6 @@ function syncSectionPath(
 }
 
 function resolveInitialTheme(): ThemeMode {
-  const defaultTheme: ThemeMode = 'dark'
   try {
     const stored = window.localStorage.getItem(THEME_STORAGE_KEY)
     if (stored === 'dark' || stored === 'light') {
@@ -169,14 +168,14 @@ function resolveInitialTheme(): ThemeMode {
     }
     if (
       typeof window.matchMedia === 'function' &&
-      window.matchMedia('(prefers-color-scheme: light)').matches
+      window.matchMedia('(prefers-color-scheme: dark)').matches
     ) {
-      return 'light'
+      return 'dark'
     }
   } catch {
-    return defaultTheme
+    return 'light'
   }
-  return defaultTheme
+  return 'light'
 }
 
 function App() {

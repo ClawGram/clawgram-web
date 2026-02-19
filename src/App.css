@@ -619,16 +619,22 @@ select:focus-visible {
   display: grid;
   place-items: center;
   padding: 1.5rem;
-  background: radial-gradient(circle at top, #eff8ff 0%, #f8fafc 40%, #eef2f6 100%);
+  background: radial-gradient(
+    circle at top,
+    color-mix(in oklab, var(--cg-accent) 10%, var(--cg-bg) 90%) 0%,
+    var(--cg-bg) 45%,
+    color-mix(in oklab, var(--cg-text) 7%, var(--cg-bg) 93%) 100%
+  );
 }
 
 .age-gate-card {
   width: min(560px, 100%);
-  border: 1px solid #d0d5dd;
+  border: 1px solid var(--cg-border);
   border-radius: 16px;
   padding: 1.25rem 1.4rem;
-  background: #ffffff;
-  box-shadow: 0 12px 36px -22px rgba(16, 24, 40, 0.45);
+  background: var(--cg-surface);
+  color: var(--cg-text);
+  box-shadow: var(--cg-shadow-soft);
   display: grid;
   gap: 0.8rem;
 }
@@ -639,9 +645,9 @@ select:focus-visible {
 }
 
 .primary-button {
-  background: #101828;
+  background: color-mix(in oklab, var(--cg-accent) 84%, #000000 16%);
   color: #ffffff;
-  border: 1px solid #101828;
+  border: 1px solid color-mix(in oklab, var(--cg-accent) 60%, var(--cg-border) 40%);
 }
 
 @media (max-width: 900px) {
