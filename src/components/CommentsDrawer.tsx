@@ -21,6 +21,7 @@ type CommentsDrawerProps = {
   onClose: () => void
   onLoadMoreComments: (cursor: string) => void
   onLoadCommentReplies: (commentId: string, cursor?: string) => void
+  onOpenAuthorProfile: (agentName: string) => void
 }
 
 function renderCommentBody(comment: UiComment): string {
@@ -42,6 +43,7 @@ export function CommentsDrawer({
   onClose,
   onLoadMoreComments,
   onLoadCommentReplies,
+  onOpenAuthorProfile,
 }: CommentsDrawerProps) {
   return (
     <Sheet open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : null)}>
@@ -52,7 +54,7 @@ export function CommentsDrawer({
             {post ? <SheetDescription>{post.author.name}</SheetDescription> : null}
           </div>
           <SheetClose asChild>
-            <Button type="button" variant="outline" size="sm">
+            <Button type="button" variant="outline" size="sm" className="comments-drawer-close-button">
               Close
             </Button>
           </SheetClose>
@@ -85,24 +87,30 @@ export function CommentsDrawer({
               <ul className="thread-comment-list">
                 {commentsState.page.items.map((comment) => {
                   const repliesState = replyPagesByCommentId[comment.id] ?? defaultCommentPageState()
+                  const commentAuthorName = comment.author.name || 'unknown-agent'
                   return (
                     <li key={comment.id} className="thread-comment-item">
                       <div className="thread-comment-header">
-                        <div className="thread-comment-author">
+                        <button
+                          type="button"
+                          className="thread-comment-author"
+                          onClick={() => onOpenAuthorProfile(commentAuthorName)}
+                          aria-label={`Open profile for ${commentAuthorName}`}
+                        >
                           {comment.author.avatarUrl ? (
                             <img
                               src={comment.author.avatarUrl}
-                              alt={`${comment.author.name} avatar`}
+                              alt={`${commentAuthorName} avatar`}
                               className="thread-comment-avatar"
                               loading="lazy"
                             />
                           ) : (
                             <span className="thread-comment-avatar thread-comment-avatar-fallback" aria-hidden="true">
-                              {comment.author.name[0]?.toUpperCase() ?? '?'}
+                              {commentAuthorName[0]?.toUpperCase() ?? '?'}
                             </span>
                           )}
-                          <strong>{comment.author.name}</strong>
-                        </div>
+                          <strong>{commentAuthorName}</strong>
+                        </button>
                         <span>depth {comment.depth}</span>
                         <span>{formatTimestamp(comment.createdAt)}</span>
                       </div>
@@ -139,30 +147,38 @@ export function CommentsDrawer({
 
                       {repliesState.page.items.length > 0 ? (
                         <ul className="reply-list">
-                          {repliesState.page.items.map((reply) => (
-                            <li key={reply.id} className="reply-item">
-                              <div className="thread-comment-header">
-                                <div className="thread-comment-author">
-                                  {reply.author.avatarUrl ? (
-                                    <img
-                                      src={reply.author.avatarUrl}
-                                      alt={`${reply.author.name} avatar`}
-                                      className="thread-comment-avatar"
-                                      loading="lazy"
-                                    />
-                                  ) : (
-                                    <span className="thread-comment-avatar thread-comment-avatar-fallback" aria-hidden="true">
-                                      {reply.author.name[0]?.toUpperCase() ?? '?'}
-                                    </span>
-                                  )}
-                                  <strong>{reply.author.name}</strong>
+                          {repliesState.page.items.map((reply) => {
+                            const replyAuthorName = reply.author.name || 'unknown-agent'
+                            return (
+                              <li key={reply.id} className="reply-item">
+                                <div className="thread-comment-header">
+                                  <button
+                                    type="button"
+                                    className="thread-comment-author"
+                                    onClick={() => onOpenAuthorProfile(replyAuthorName)}
+                                    aria-label={`Open profile for ${replyAuthorName}`}
+                                  >
+                                    {reply.author.avatarUrl ? (
+                                      <img
+                                        src={reply.author.avatarUrl}
+                                        alt={`${replyAuthorName} avatar`}
+                                        className="thread-comment-avatar"
+                                        loading="lazy"
+                                      />
+                                    ) : (
+                                      <span className="thread-comment-avatar thread-comment-avatar-fallback" aria-hidden="true">
+                                        {replyAuthorName[0]?.toUpperCase() ?? '?'}
+                                      </span>
+                                    )}
+                                    <strong>{replyAuthorName}</strong>
+                                  </button>
+                                  <span>depth {reply.depth}</span>
+                                  <span>{formatTimestamp(reply.createdAt)}</span>
                                 </div>
-                                <span>depth {reply.depth}</span>
-                                <span>{formatTimestamp(reply.createdAt)}</span>
-                              </div>
-                              <p className="thread-comment-body">{renderCommentBody(reply)}</p>
-                            </li>
-                          ))}
+                                <p className="thread-comment-body">{renderCommentBody(reply)}</p>
+                              </li>
+                            )
+                          })}
                         </ul>
                       ) : null}
 

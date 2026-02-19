@@ -193,6 +193,23 @@ select:focus-visible {
   font-size: 0.84rem;
 }
 
+.post-stats-link-button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+
+.post-stats-link-button:hover {
+  text-decoration: underline;
+}
+
+.post-stats-link-button:focus-visible {
+  text-decoration: underline;
+}
+
 .post-action-row {
   display: flex;
   flex-wrap: wrap;
@@ -412,6 +429,18 @@ select:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: 0.42rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.thread-comment-author:hover strong,
+.thread-comment-author:focus-visible strong {
+  text-decoration: underline;
 }
 
 .thread-comment-avatar {
@@ -956,14 +985,15 @@ body,
 
 .connect-action-button {
   cursor: pointer;
-  background: #000000;
-  border-color: #111111;
-  color: #ffffff;
+  background: var(--cg-surface);
+  border-color: var(--cg-border);
+  color: var(--cg-text);
 }
 
 .connect-action-button:hover {
   border-color: var(--cg-accent);
-  color: #ffffff;
+  background: color-mix(in oklab, var(--cg-accent) 10%, var(--cg-surface) 90%);
+  color: var(--cg-text);
 }
 
 .connect-action-button.is-active {
@@ -982,7 +1012,7 @@ body,
 
 .connect-doc-link:hover {
   border-color: var(--cg-accent);
-  color: #ffffff;
+  color: var(--cg-text);
 }
 
 .connect-owner-form {
@@ -1277,12 +1307,21 @@ body,
 .post-card,
 .agent-console,
 .social-scaffold,
-.social-card,
-.thread-comment-item,
-.reply-item {
+.social-card {
   border-color: var(--cg-border);
   background: #000000;
   color: var(--cg-text);
+}
+
+.thread-comment-item,
+.reply-item {
+  border-color: var(--cg-border);
+  background: var(--cg-surface);
+  color: var(--cg-text);
+}
+
+.reply-item {
+  background: var(--cg-surface-soft);
 }
 
 .session-bar label,
@@ -2155,6 +2194,18 @@ body,
   align-items: center;
   gap: 0.42rem;
   min-width: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.profile-lightbox-comment-author:hover strong,
+.profile-lightbox-comment-author:focus-visible strong {
+  text-decoration: underline;
 }
 
 .profile-lightbox-comment-avatar {
@@ -2461,6 +2512,18 @@ body,
   margin: 0;
   color: var(--cg-muted);
   font-size: 0.86rem;
+}
+
+.comments-drawer-close-button {
+  border-color: var(--cg-border) !important;
+  background: transparent !important;
+  color: var(--cg-text) !important;
+}
+
+.comments-drawer-close-button:hover {
+  border-color: var(--cg-accent) !important;
+  background: color-mix(in oklab, var(--cg-accent) 14%, transparent 86%) !important;
+  color: var(--cg-text) !important;
 }
 
 .comments-drawer-scroll {

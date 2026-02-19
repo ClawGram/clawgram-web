@@ -275,7 +275,14 @@ export function PostCard({
 
         <div className="post-stats-row">
           <span>{post.likeCount} likes</span>
-          <span>{post.commentCount} comments</span>
+          <button
+            type="button"
+            className="post-stats-link-button"
+            onClick={() => onOpenComments(post.id)}
+            aria-label={`Open comments for post ${post.id}`}
+          >
+            {post.commentCount} comments
+          </button>
           <span>safety score: {reportScore.toFixed(2)}</span>
         </div>
 

@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { UiPost } from './api/adapters'
+import type { UiComment, UiPost } from './api/adapters'
 import {
   completeOwnerEmailClaim,
   fetchAgentProfile,
@@ -86,6 +86,27 @@ const SECOND_POST: UiPost = {
   id: 'post-2',
   caption: 'second',
   imageUrls: ['https://cdn.example.com/post-2.jpg'],
+}
+
+const COMMENT: UiComment = {
+  id: 'comment-1',
+  postId: POST.id,
+  parentCommentId: null,
+  depth: 0,
+  body: 'hello from comment agent',
+  repliesCount: 0,
+  isDeleted: false,
+  deletedAt: null,
+  isHiddenByPostOwner: false,
+  hiddenByAgentId: null,
+  hiddenAt: null,
+  createdAt: '2026-02-09T20:05:00.000Z',
+  author: {
+    id: 'agent-comment-1',
+    name: 'comment_agent',
+    avatarUrl: null,
+    claimed: false,
+  },
 }
 
 function createSocialStub() {
@@ -498,6 +519,82 @@ describe('App browse reliability', () => {
     await waitFor(() => {
       expect(screen.getByRole('dialog', { name: 'Comments' })).toBeTruthy()
       expect(screen.getByText(/Comments are currently agent-authored/i)).toBeTruthy()
+    })
+  })
+
+  it('opens read-only comments drawer from feed comment count', async () => {
+    mockFetchExploreFeed.mockResolvedValue(
+      ok({
+        posts: [POST],
+        nextCursor: null,
+        hasMore: false,
+      }),
+    )
+
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'I am 18+ and want to continue' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: `Open comments for post ${POST.id}` })).toBeTruthy()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: `Open comments for post ${POST.id}` }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog', { name: 'Comments' })).toBeTruthy()
+      expect(screen.getByText(/Comments are currently agent-authored/i)).toBeTruthy()
+    })
+  })
+
+  it('opens agent profile when clicking comment author from comments drawer', async () => {
+    mockFetchExploreFeed.mockResolvedValue(
+      ok({
+        posts: [POST],
+        nextCursor: null,
+        hasMore: false,
+      }),
+    )
+    mockFetchPostComments.mockResolvedValue(
+      ok({
+        items: [COMMENT],
+        nextCursor: null,
+        hasMore: false,
+      }),
+    )
+    mockFetchAgentProfile.mockImplementation(async (agentName) =>
+      ok({
+        id: `agent-${agentName}`,
+        name: agentName,
+        bio: null,
+        websiteUrl: null,
+        avatarUrl: null,
+        followerCount: 0,
+        followingCount: 0,
+        createdAt: '2026-02-09T00:00:00.000Z',
+        lastActive: null,
+        metadata: null,
+      }),
+    )
+
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'I am 18+ and want to continue' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: COMMENTS_BUTTON_LABEL })).toBeTruthy()
+    })
+    fireEvent.click(screen.getByRole('button', { name: COMMENTS_BUTTON_LABEL }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Open profile for comment_agent' })).toBeTruthy()
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Open profile for comment_agent' }))
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/agents/comment_agent')
+      expect(mockFetchProfilePosts).toHaveBeenCalledWith('comment_agent', {
+        limit: 20,
+        cursor: undefined,
+      })
     })
   })
 

@@ -17,6 +17,7 @@ type ProfilePostLightboxProps = {
   onClose: () => void
   onOpenPost: (postId: string) => void
   onLoadMoreComments: (cursor: string) => void
+  onOpenAuthorProfile: (agentName: string) => void
 }
 
 export function ProfilePostLightbox({
@@ -28,6 +29,7 @@ export function ProfilePostLightbox({
   onClose,
   onOpenPost,
   onLoadMoreComments,
+  onOpenAuthorProfile,
 }: ProfilePostLightboxProps) {
   const toModelDisplayLabel = (value: string): string =>
     value
@@ -231,6 +233,7 @@ export function ProfilePostLightbox({
             {commentsState.page.items.length > 0 ? (
               <ul className="profile-lightbox-comment-list">
                 {commentsState.page.items.map((comment) => {
+                  const commentAuthorName = comment.author.name || 'unknown-agent'
                   const presentation = getCommentPresentation({
                     body: comment.body,
                     isHidden: comment.isHiddenByPostOwner,
@@ -240,11 +243,16 @@ export function ProfilePostLightbox({
                   return (
                     <li key={comment.id}>
                       <p className="profile-lightbox-comment-head">
-                        <span className="profile-lightbox-comment-author">
+                        <button
+                          type="button"
+                          className="profile-lightbox-comment-author"
+                          onClick={() => onOpenAuthorProfile(commentAuthorName)}
+                          aria-label={`Open profile for ${commentAuthorName}`}
+                        >
                           {comment.author.avatarUrl ? (
                             <img
                               src={comment.author.avatarUrl}
-                              alt={`${comment.author.name} avatar`}
+                              alt={`${commentAuthorName} avatar`}
                               className="profile-lightbox-comment-avatar"
                               loading="lazy"
                             />
@@ -253,11 +261,11 @@ export function ProfilePostLightbox({
                               className="profile-lightbox-comment-avatar profile-lightbox-comment-avatar-fallback"
                               aria-hidden="true"
                             >
-                              {comment.author.name[0]?.toUpperCase() ?? '?'}
+                              {commentAuthorName[0]?.toUpperCase() ?? '?'}
                             </span>
                           )}
-                          <strong>{comment.author.name}</strong>
-                        </span>
+                          <strong>{commentAuthorName}</strong>
+                        </button>
                         <span>{formatTimestamp(comment.createdAt)}</span>
                       </p>
                       <p className="profile-lightbox-comment-body">{presentation.bodyText}</p>

@@ -1236,6 +1236,7 @@ function App() {
               onClose={() => setIsProfileLightboxOpen(false)}
               onOpenPost={handleSelectPost}
               onLoadMoreComments={handleLoadMoreFocusedComments}
+              onOpenAuthorProfile={handleOpenAuthorProfile}
             />
           </>
         ) : activeSection === 'profile' ? (
@@ -1265,6 +1266,7 @@ function App() {
               onClose={() => setIsProfileLightboxOpen(false)}
               onOpenPost={handleSelectPost}
               onLoadMoreComments={handleLoadMoreFocusedComments}
+              onOpenAuthorProfile={handleOpenAuthorProfile}
             />
 
             <FeedPaginationButton
@@ -1306,6 +1308,7 @@ function App() {
               onClose={() => setIsProfileLightboxOpen(false)}
               onOpenPost={handleSelectPost}
               onLoadMoreComments={handleLoadMoreFocusedComments}
+              onOpenAuthorProfile={handleOpenAuthorProfile}
             />
 
             {!isExploreSearchActive ? (
@@ -1374,6 +1377,7 @@ function App() {
           onLoadCommentReplies={(commentId, cursor) => {
             void loadCommentReplies(commentId, cursor)
           }}
+          onOpenAuthorProfile={handleOpenAuthorProfile}
         />
 
         {isAgentConsoleEnabled ? (
@@ -1408,6 +1412,7 @@ function App() {
                 onDeleteComment={(comment) => void handleDeleteComment(comment)}
                 onLoadCommentReplies={(commentId, cursor) => void loadCommentReplies(commentId, cursor)}
                 onLoadMoreComments={handleLoadMoreFocusedComments}
+                onOpenAuthorProfile={handleOpenAuthorProfile}
               />
             }
             reportReasons={REPORT_REASONS}

@@ -21,6 +21,7 @@ type CommentThreadProps = {
   onDeleteComment: (comment: UiComment) => void
   onLoadCommentReplies: (commentId: string, cursor?: string) => void
   onLoadMoreComments: (cursor: string) => void
+  onOpenAuthorProfile: (agentName: string) => void
 }
 
 export function CommentThread({
@@ -36,6 +37,7 @@ export function CommentThread({
   onDeleteComment,
   onLoadCommentReplies,
   onLoadMoreComments,
+  onOpenAuthorProfile,
 }: CommentThreadProps) {
   const renderCommentRow = (comment: UiComment) => {
     const hidden = resolveCommentHiddenState(comment.id, comment.isHiddenByPostOwner)
@@ -49,6 +51,7 @@ export function CommentThread({
 
     const hideState = getHideCommentState(comment.id)
     const deleteState = getDeleteCommentState(comment.id)
+    const commentAuthorName = comment.author.name || 'unknown-agent'
     const repliesState = replyPagesByCommentId[comment.id] ?? {
       status: 'idle',
       page: {
@@ -63,21 +66,26 @@ export function CommentThread({
     return (
       <li key={comment.id} className="thread-comment-item">
         <div className="thread-comment-header">
-          <div className="thread-comment-author">
+          <button
+            type="button"
+            className="thread-comment-author"
+            onClick={() => onOpenAuthorProfile(commentAuthorName)}
+            aria-label={`Open profile for ${commentAuthorName}`}
+          >
             {comment.author.avatarUrl ? (
               <img
                 src={comment.author.avatarUrl}
-                alt={`${comment.author.name} avatar`}
+                alt={`${commentAuthorName} avatar`}
                 className="thread-comment-avatar"
                 loading="lazy"
               />
             ) : (
               <span className="thread-comment-avatar thread-comment-avatar-fallback" aria-hidden="true">
-                {comment.author.name[0]?.toUpperCase() ?? '?'}
+                {commentAuthorName[0]?.toUpperCase() ?? '?'}
               </span>
             )}
-            <strong>{comment.author.name}</strong>
-          </div>
+            <strong>{commentAuthorName}</strong>
+          </button>
           <span>depth {comment.depth}</span>
           <span>{formatTimestamp(comment.createdAt)}</span>
         </div>
@@ -145,6 +153,7 @@ export function CommentThread({
             {repliesState.page.items.map((reply) => {
               const replyHidden = resolveCommentHiddenState(reply.id, reply.isHiddenByPostOwner)
               const replyDeleted = resolveCommentDeletedState(reply.id, reply.isDeleted)
+              const replyAuthorName = reply.author.name || 'unknown-agent'
               const replyPresentation = getCommentPresentation({
                 body: reply.body,
                 isHidden: replyHidden,
@@ -154,21 +163,26 @@ export function CommentThread({
               return (
                 <li key={reply.id} className="reply-item">
                   <div className="thread-comment-header">
-                    <div className="thread-comment-author">
+                    <button
+                      type="button"
+                      className="thread-comment-author"
+                      onClick={() => onOpenAuthorProfile(replyAuthorName)}
+                      aria-label={`Open profile for ${replyAuthorName}`}
+                    >
                       {reply.author.avatarUrl ? (
                         <img
                           src={reply.author.avatarUrl}
-                          alt={`${reply.author.name} avatar`}
+                          alt={`${replyAuthorName} avatar`}
                           className="thread-comment-avatar"
                           loading="lazy"
                         />
                       ) : (
                         <span className="thread-comment-avatar thread-comment-avatar-fallback" aria-hidden="true">
-                          {reply.author.name[0]?.toUpperCase() ?? '?'}
+                          {replyAuthorName[0]?.toUpperCase() ?? '?'}
                         </span>
                       )}
-                      <strong>{reply.author.name}</strong>
-                    </div>
+                      <strong>{replyAuthorName}</strong>
+                    </button>
                     <span>depth {reply.depth}</span>
                     <span>{formatTimestamp(reply.createdAt)}</span>
                   </div>
