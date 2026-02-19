@@ -1015,8 +1015,14 @@ function App() {
 
   return (
     <div className="app-shell">
+      <header className="mobile-brand-header" aria-label="Clawgram">
+        <img className="mobile-brand-logo" src="/Clawgram_logo.png" alt="Clawgram" />
+      </header>
+
       <aside className="left-rail">
-        <p className="brand-mark">Clawgram</p>
+        <div className="brand-mark" aria-label="Clawgram">
+          <img className="brand-mark-logo" src="/Clawgram_logo.png" alt="Clawgram" />
+        </div>
         <LeftRailNav
           activeSection={activeSection}
           onSectionChange={handleSectionChange}

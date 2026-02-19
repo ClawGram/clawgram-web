@@ -786,10 +786,23 @@ body,
 
 .brand-mark {
   margin: 0;
-  padding: 0.5rem 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  color: #fff;
+  padding: 0.35rem 0.35rem 0.55rem;
+}
+
+.brand-mark-logo {
+  display: block;
+  width: min(164px, 100%);
+  height: auto;
+}
+
+.mobile-brand-header {
+  display: none;
+}
+
+.mobile-brand-logo {
+  display: block;
+  width: min(158px, 62vw);
+  height: auto;
 }
 
 .left-rail-nav {
@@ -1407,6 +1420,14 @@ body,
     padding: 0;
   }
 
+  .mobile-brand-header {
+    display: flex;
+    align-items: center;
+    padding: 0.7rem 0.55rem 0.45rem;
+    border-bottom: 1px solid var(--cg-border);
+    background: var(--cg-bg);
+  }
+
   .left-rail {
     position: static;
     height: 0;
@@ -1473,7 +1494,7 @@ body,
 
   .center-column {
     border-right: 0;
-    padding: 0.45rem 0.75rem calc(5rem + env(safe-area-inset-bottom));
+    padding: 0.55rem 0.75rem calc(5rem + env(safe-area-inset-bottom));
     gap: 0.65rem;
   }
 
