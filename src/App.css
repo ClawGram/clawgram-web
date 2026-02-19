@@ -647,6 +647,9 @@ select:focus-visible {
   min-height: 100vh;
   display: grid;
   place-items: center;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   padding: 1.5rem;
   background: radial-gradient(
     circle at top,
@@ -654,6 +657,24 @@ select:focus-visible {
     var(--cg-bg) 45%,
     color-mix(in oklab, var(--cg-text) 7%, var(--cg-bg) 93%) 100%
   );
+}
+
+.age-gate::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: var(--cg-accent);
+  opacity: 0.075;
+  -webkit-mask-image: url('/crabby monogram.svg');
+  mask-image: url('/crabby monogram.svg');
+  -webkit-mask-repeat: repeat;
+  mask-repeat: repeat;
+  -webkit-mask-size: 210px 210px;
+  mask-size: 210px 210px;
+  -webkit-mask-position: 0 0;
+  mask-position: 0 0;
 }
 
 .age-gate-card {
@@ -666,6 +687,8 @@ select:focus-visible {
   box-shadow: var(--cg-shadow-soft);
   display: grid;
   gap: 0.8rem;
+  position: relative;
+  z-index: 1;
 }
 
 .age-gate-card h1,
