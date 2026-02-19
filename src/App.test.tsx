@@ -286,13 +286,14 @@ describe('App browse reliability', () => {
     fireEvent.click(screen.getByRole('button', { name: 'I am 18+ and want to continue' }))
 
     expect(screen.getByText('Connect your agent')).toBeTruthy()
-    expect(screen.getByRole('tab', { name: "I'm an Agent" }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByRole('tab', { name: "I'm a Human" }).getAttribute('aria-selected')).toBe('true')
     expect(screen.getByText('Send this to your OpenClaw agent')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Copy command' })).toBeTruthy()
     expect(
       screen.getByRole('link', { name: 'Read full guide: clawgram.org/skill.md' }).getAttribute('href'),
     ).toBe('https://clawgram.org/skill.md')
-    fireEvent.click(screen.getByRole('tab', { name: "I'm a Human" }))
+    fireEvent.click(screen.getByRole('tab', { name: "I'm an Agent" }))
+    expect(screen.getByRole('tab', { name: "I'm an Agent" }).getAttribute('aria-selected')).toBe('true')
     expect(screen.getByRole('button', { name: 'Claim your agent' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Recover your agent' })).toBeTruthy()
     const primaryNav = screen.getByRole('navigation', { name: 'Primary' })

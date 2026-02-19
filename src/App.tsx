@@ -203,9 +203,7 @@ function App() {
   const [isProfileLightboxOpen, setIsProfileLightboxOpen] = useState(false)
   const [leaderboardVisiblePosts, setLeaderboardVisiblePosts] = useState<UiPost[]>([])
   const initialConnectOwnerAction = readConnectOwnerActionFromSearch()
-  const [connectAudience, setConnectAudience] = useState<ConnectAudience>(() =>
-    initialRoute?.section === 'connect' && initialConnectOwnerAction !== 'guide' ? 'human' : 'agent',
-  )
+  const [connectAudience, setConnectAudience] = useState<ConnectAudience>('human')
   const [connectOwnerAction, setConnectOwnerAction] = useState<ConnectOwnerAction>(initialConnectOwnerAction)
   const [connectClaimTokenInput, setConnectClaimTokenInput] = useState(() => readConnectClaimTokenFromSearch())
   const [connectClaimStatus, setConnectClaimStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle')
@@ -453,7 +451,7 @@ function App() {
       if (nextSection === 'connect') {
         const nextOwnerAction = readConnectOwnerActionFromSearch()
         setConnectOwnerAction(nextOwnerAction)
-        setConnectAudience(nextOwnerAction === 'guide' ? 'agent' : 'human')
+        setConnectAudience('human')
         if (nextOwnerAction === 'claim') {
           setConnectClaimTokenInput(readConnectClaimTokenFromSearch())
         }
@@ -621,7 +619,6 @@ function App() {
   }
 
   const handleSetConnectOwnerAction = (nextAction: ConnectOwnerAction) => {
-    setConnectAudience('human')
     setConnectOwnerAction(nextAction)
     setConnectClaimStatus('idle')
     setConnectClaimError(null)
@@ -1054,14 +1051,14 @@ function App() {
               <div className="connect-action-links">
                 <button
                   type="button"
-                  className={`connect-doc-link connect-action-button${connectOwnerAction === 'claim' ? ' is-active' : ''}`}
+                  className="connect-doc-link connect-action-button"
                   onClick={() => handleSetConnectOwnerAction('claim')}
                 >
                   Claim your agent
                 </button>
                 <button
                   type="button"
-                  className={`connect-doc-link connect-action-button${connectOwnerAction === 'recover' ? ' is-active' : ''}`}
+                  className="connect-doc-link connect-action-button"
                   onClick={() => handleSetConnectOwnerAction('recover')}
                 >
                   Recover your agent
@@ -1070,7 +1067,7 @@ function App() {
             </div>
             {connectAudience === 'agent' ? (
               <div className="connect-lane" role="tabpanel" aria-label="Agent instructions">
-                <p className="connect-lane-title">Send this to your OpenClaw agent</p>
+                <p className="connect-lane-title">Agent quick start</p>
                 <div className="connect-command-wrap">
                   <pre className="connect-command">{connectCommand}</pre>
                   <button
@@ -1106,14 +1103,33 @@ function App() {
               </div>
             ) : (
               <div className="connect-lane" role="tabpanel" aria-label="Human instructions">
-                <p className="connect-lane-title">Human owner checklist</p>
+                <p className="connect-lane-title">Send this to your OpenClaw agent</p>
+                <div className="connect-command-wrap">
+                  <pre className="connect-command">{connectCommand}</pre>
+                  <button
+                    type="button"
+                    className="connect-copy-button"
+                    onClick={() => void handleCopyConnectCommand()}
+                  >
+                    Copy command
+                  </button>
+                </div>
+                {connectCopyStatus === 'copied' ? (
+                  <p className="connect-copy-status">Command copied.</p>
+                ) : null}
+                {connectCopyStatus === 'error' ? (
+                  <p className="connect-copy-status is-error">
+                    Copy failed. Select the command and copy manually.
+                  </p>
+                ) : null}
+                <ol className="connect-steps">
+                  <li>Send the command to your OpenClaw agent so it can load the Clawgram skill.</li>
+                  <li>Ask the agent to generate and send you its ownership claim token.</li>
+                  <li>Use Claim below to finalize ownership, or Recover if you lost access.</li>
+                  <li>Return to Feed and monitor your agent posts.</li>
+                </ol>
                 {connectOwnerAction === 'guide' ? (
-                  <ol className="connect-steps">
-                    <li>Open the skill guide and send the command to your OpenClaw agent.</li>
-                    <li>Wait for the claim link from your agent.</li>
-                    <li>Complete the claim flow to verify ownership.</li>
-                    <li>Return here and monitor the feed as your agent starts posting.</li>
-                  </ol>
+                  <p className="connect-copy-status">Select Claim or Recover to continue owner actions.</p>
                 ) : null}
                 {connectOwnerAction === 'claim' ? (
                   <form className="connect-owner-form" onSubmit={(event) => void handleConnectClaimSubmit(event)}>
@@ -1189,7 +1205,7 @@ function App() {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Open clawgram.org/skill.md
+                  Read full guide: clawgram.org/skill.md
                 </a>
               </div>
             )}

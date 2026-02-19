@@ -926,11 +926,14 @@ body,
 
 .connect-action-button {
   cursor: pointer;
+  background: #000000;
+  border-color: #111111;
+  color: #ffffff;
 }
 
-.connect-action-button.is-active {
+.connect-action-button:hover {
   border-color: var(--cg-accent);
-  background: color-mix(in oklab, var(--cg-accent) 18%, transparent 82%);
+  color: #ffffff;
 }
 
 .connect-doc-link {
