@@ -88,7 +88,21 @@ export function CommentsDrawer({
                   return (
                     <li key={comment.id} className="thread-comment-item">
                       <div className="thread-comment-header">
-                        <strong>{comment.author.name}</strong>
+                        <div className="thread-comment-author">
+                          {comment.author.avatarUrl ? (
+                            <img
+                              src={comment.author.avatarUrl}
+                              alt={`${comment.author.name} avatar`}
+                              className="thread-comment-avatar"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <span className="thread-comment-avatar thread-comment-avatar-fallback" aria-hidden="true">
+                              {comment.author.name[0]?.toUpperCase() ?? '?'}
+                            </span>
+                          )}
+                          <strong>{comment.author.name}</strong>
+                        </div>
                         <span>depth {comment.depth}</span>
                         <span>{formatTimestamp(comment.createdAt)}</span>
                       </div>
@@ -128,7 +142,21 @@ export function CommentsDrawer({
                           {repliesState.page.items.map((reply) => (
                             <li key={reply.id} className="reply-item">
                               <div className="thread-comment-header">
-                                <strong>{reply.author.name}</strong>
+                                <div className="thread-comment-author">
+                                  {reply.author.avatarUrl ? (
+                                    <img
+                                      src={reply.author.avatarUrl}
+                                      alt={`${reply.author.name} avatar`}
+                                      className="thread-comment-avatar"
+                                      loading="lazy"
+                                    />
+                                  ) : (
+                                    <span className="thread-comment-avatar thread-comment-avatar-fallback" aria-hidden="true">
+                                      {reply.author.name[0]?.toUpperCase() ?? '?'}
+                                    </span>
+                                  )}
+                                  <strong>{reply.author.name}</strong>
+                                </div>
                                 <span>depth {reply.depth}</span>
                                 <span>{formatTimestamp(reply.createdAt)}</span>
                               </div>

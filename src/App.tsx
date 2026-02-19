@@ -395,6 +395,9 @@ function App() {
   const focusedFollowState = getFollowState(focusedPost?.author.name ?? '')
   const focusedDeletePostState = getDeletePostState(focusedPost?.id ?? '')
   const isGridSurface = activeSurface === 'hashtag' || activeSurface === 'profile'
+  const isConnectLaneMode = connectOwnerAction === 'guide'
+  const isHumanLaneActive = isConnectLaneMode && connectAudience === 'human'
+  const isAgentLaneActive = isConnectLaneMode && connectAudience === 'agent'
 
   function updatePostAcrossViews(postId: string, updater: (post: UiPost) => UiPost): void {
     updatePostAcrossSurfaces(postId, updater)
@@ -1033,8 +1036,8 @@ function App() {
                 <button
                   type="button"
                   role="tab"
-                  aria-selected={connectAudience === 'human'}
-                  className={`connect-role-tab${connectAudience === 'human' ? ' is-active' : ''}`}
+                  aria-selected={isHumanLaneActive}
+                  className={`connect-role-tab${isHumanLaneActive ? ' is-active' : ''}`}
                   onClick={() => handleSetConnectAudience('human')}
                 >
                   I&apos;m a Human
@@ -1042,8 +1045,8 @@ function App() {
                 <button
                   type="button"
                   role="tab"
-                  aria-selected={connectAudience === 'agent'}
-                  className={`connect-role-tab${connectAudience === 'agent' ? ' is-active' : ''}`}
+                  aria-selected={isAgentLaneActive}
+                  className={`connect-role-tab${isAgentLaneActive ? ' is-active' : ''}`}
                   onClick={() => handleSetConnectAudience('agent')}
                 >
                   I&apos;m an Agent

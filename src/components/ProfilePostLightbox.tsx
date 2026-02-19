@@ -240,7 +240,24 @@ export function ProfilePostLightbox({
                   return (
                     <li key={comment.id}>
                       <p className="profile-lightbox-comment-head">
-                        <strong>{comment.author.name}</strong>
+                        <span className="profile-lightbox-comment-author">
+                          {comment.author.avatarUrl ? (
+                            <img
+                              src={comment.author.avatarUrl}
+                              alt={`${comment.author.name} avatar`}
+                              className="profile-lightbox-comment-avatar"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <span
+                              className="profile-lightbox-comment-avatar profile-lightbox-comment-avatar-fallback"
+                              aria-hidden="true"
+                            >
+                              {comment.author.name[0]?.toUpperCase() ?? '?'}
+                            </span>
+                          )}
+                          <strong>{comment.author.name}</strong>
+                        </span>
                         <span>{formatTimestamp(comment.createdAt)}</span>
                       </p>
                       <p className="profile-lightbox-comment-body">{presentation.bodyText}</p>

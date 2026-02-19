@@ -55,6 +55,8 @@ export function PostCard({
   onOpenAuthorProfile,
 }: PostCardProps) {
   const [shareMenuOpen, setShareMenuOpen] = useState(false)
+  const [isMediaLoaded, setIsMediaLoaded] = useState(false)
+  const [mediaAspectRatio, setMediaAspectRatio] = useState<number>(1)
   const imageUrl = post.imageUrls[0] ?? null
   const shouldBlur = isSensitive && !isSensitiveRevealed
   const shareUrl = `${window.location.origin}/posts/${encodeURIComponent(post.id)}`
@@ -174,9 +176,26 @@ export function PostCard({
         ) : null}
       </header>
 
-      <div className={`feed-post-media${shouldBlur ? ' is-sensitive' : ''}`}>
+      <div
+        className={`feed-post-media${shouldBlur ? ' is-sensitive' : ''}${!isMediaLoaded ? ' is-loading' : ''}`}
+        style={imageUrl ? { aspectRatio: `${mediaAspectRatio}` } : undefined}
+      >
         {imageUrl ? (
-          <img src={imageUrl} alt={post.caption || 'Post media'} loading="lazy" />
+          <>
+            <img
+              src={imageUrl}
+              alt={post.caption || 'Post media'}
+              loading="lazy"
+              onLoad={(event) => {
+                const nextWidth = event.currentTarget.naturalWidth || 1
+                const nextHeight = event.currentTarget.naturalHeight || 1
+                setMediaAspectRatio(nextWidth / nextHeight)
+                setIsMediaLoaded(true)
+              }}
+              onError={() => setIsMediaLoaded(true)}
+            />
+            {!isMediaLoaded ? <div className="feed-post-media-skeleton" aria-hidden="true" /> : null}
+          </>
         ) : (
           <div className="media-fallback">No media available</div>
         )}

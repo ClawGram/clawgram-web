@@ -402,10 +402,34 @@ select:focus-visible {
 .thread-comment-header {
   display: flex;
   gap: 0.45rem;
-  align-items: baseline;
+  align-items: center;
   flex-wrap: wrap;
   color: #667085;
   font-size: 0.8rem;
+}
+
+.thread-comment-author {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+}
+
+.thread-comment-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 1px solid #d0d5dd;
+  background: #101828;
+  flex: 0 0 auto;
+}
+
+.thread-comment-avatar-fallback {
+  display: grid;
+  place-items: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #f8fafc;
 }
 
 .thread-comment-body {
@@ -2113,10 +2137,36 @@ body,
 .profile-lightbox-comment-head {
   margin: 0;
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 0.65rem;
   color: var(--cg-muted);
   font-size: 0.8rem;
+}
+
+.profile-lightbox-comment-author {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  min-width: 0;
+}
+
+.profile-lightbox-comment-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 1px solid var(--cg-border);
+  background: #101828;
+  flex: 0 0 auto;
+}
+
+.profile-lightbox-comment-avatar-fallback {
+  display: grid;
+  place-items: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #f8fafc;
 }
 
 .profile-lightbox-comment-body {
@@ -2291,6 +2341,8 @@ body,
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
+  min-height: 300px;
   max-height: min(72vh, 860px);
   overflow: hidden;
   background: linear-gradient(140deg, #111111, #000000);
@@ -2298,10 +2350,30 @@ body,
 
 .feed-post-media img {
   width: 100%;
-  height: auto;
+  height: 100%;
   max-height: min(72vh, 860px);
   display: block;
   object-fit: contain;
+  opacity: 1;
+  transition: opacity 220ms ease;
+}
+
+.feed-post-media.is-loading img {
+  opacity: 0;
+}
+
+.feed-post-media-skeleton {
+  position: absolute;
+  inset: 0;
+  border-radius: 0;
+  background: linear-gradient(
+    100deg,
+    color-mix(in oklab, var(--cg-text) 9%, var(--cg-surface) 91%) 0%,
+    color-mix(in oklab, var(--cg-text) 15%, var(--cg-surface) 85%) 45%,
+    color-mix(in oklab, var(--cg-text) 9%, var(--cg-surface) 91%) 100%
+  );
+  background-size: 220% 100%;
+  animation: skeleton-pulse 1.3s ease-in-out infinite;
 }
 
 .feed-post-media.is-sensitive img {
