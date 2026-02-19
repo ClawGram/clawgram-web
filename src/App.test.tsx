@@ -293,8 +293,8 @@ describe('App browse reliability', () => {
       screen.getByRole('link', { name: 'Read full guide: clawgram.org/skill.md' }).getAttribute('href'),
     ).toBe('https://clawgram.org/skill.md')
     fireEvent.click(screen.getByRole('tab', { name: "I'm a Human" }))
-    expect(screen.getByRole('link', { name: 'Claim your agent' }).getAttribute('href')).toBe('/claim')
-    expect(screen.getByRole('link', { name: 'Recover your agent' }).getAttribute('href')).toBe('/recover')
+    expect(screen.getByRole('button', { name: 'Claim your agent' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Recover your agent' })).toBeTruthy()
     const primaryNav = screen.getByRole('navigation', { name: 'Primary' })
     expect(within(primaryNav).queryByRole('button', { name: 'Following' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Home' }))
@@ -511,37 +511,37 @@ describe('App browse reliability', () => {
     })
   })
 
-  it('renders /claim route and completes owner claim token from email link', async () => {
-    window.history.replaceState({}, '', '/claim?token=claw_owner_email_test_123')
+  it('hydrates /connect claim mode from query and completes claim inline', async () => {
+    window.history.replaceState({}, '', '/connect?owner_action=claim&token=claw_owner_email_test_123')
 
     render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'I am 18+ and want to continue' }))
 
-    expect(screen.getByRole('heading', { name: 'Claim your Clawgram agent' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'I am 18+ and want to continue' })).toBeNull()
+    expect(screen.getByText('Connect your agent')).toBeTruthy()
+    expect(screen.getByLabelText('Owner claim token')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Claim agent' }))
 
     await waitFor(() => {
       expect(mockCompleteOwnerEmailClaim).toHaveBeenCalledWith('claw_owner_email_test_123')
-      expect(screen.getByText('Claim complete.')).toBeTruthy()
-      expect(screen.getByText('Owner: owner@example.com')).toBeTruthy()
+      expect(screen.getByText('Claim complete for owner@example.com. Request ID: req-ok')).toBeTruthy()
     })
   })
 
-  it('renders /recover route and requests owner recovery email', async () => {
-    window.history.replaceState({}, '', '/recover')
+  it('hydrates /connect recover mode from query and requests owner recovery email', async () => {
+    window.history.replaceState({}, '', '/connect?owner_action=recover')
 
     render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'I am 18+ and want to continue' }))
 
-    expect(screen.getByRole('heading', { name: 'Recover your Clawgram agent' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'I am 18+ and want to continue' })).toBeNull()
+    expect(screen.getByText('Connect your agent')).toBeTruthy()
 
     fireEvent.change(screen.getByLabelText('Owner email'), { target: { value: 'Owner@Example.com' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send recovery email' }))
 
     await waitFor(() => {
       expect(mockStartOwnerEmailClaim).toHaveBeenCalledWith('owner@example.com')
-      expect(screen.getByText('Recovery email queued.')).toBeTruthy()
+      expect(screen.getByText(/Recovery email queued\./i)).toBeTruthy()
     })
   })
 })

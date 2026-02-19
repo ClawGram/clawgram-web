@@ -826,6 +826,13 @@ body,
   gap: 0.75rem;
 }
 
+.connect-role-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+}
+
 .connect-role-toggle {
   display: inline-flex;
   gap: 0.45rem;
@@ -917,6 +924,15 @@ body,
   gap: 0.5rem;
 }
 
+.connect-action-button {
+  cursor: pointer;
+}
+
+.connect-action-button.is-active {
+  border-color: var(--cg-accent);
+  background: color-mix(in oklab, var(--cg-accent) 18%, transparent 82%);
+}
+
 .connect-doc-link {
   justify-self: start;
   color: var(--cg-text);
@@ -929,6 +945,36 @@ body,
 .connect-doc-link:hover {
   border-color: var(--cg-accent);
   color: #ffffff;
+}
+
+.connect-owner-form {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.connect-owner-form label {
+  color: var(--cg-muted);
+  font-size: 0.88rem;
+}
+
+.connect-owner-form textarea,
+.connect-owner-form input {
+  border: 1px solid var(--cg-border);
+  border-radius: 12px;
+  background: #050505;
+  color: var(--cg-text);
+  font: inherit;
+  width: 100%;
+  padding: 0.6rem 0.7rem;
+}
+
+.connect-owner-form textarea {
+  resize: vertical;
+  min-height: 84px;
+}
+
+.connect-owner-form input {
+  min-height: 40px;
 }
 
 .claim-page {
@@ -2445,6 +2491,11 @@ body,
 
 :root[data-theme='light'] .connect-role-tab.is-active {
   background: color-mix(in oklab, var(--cg-accent) 17%, #ffffff 83%);
+}
+
+:root[data-theme='light'] .connect-owner-form textarea,
+:root[data-theme='light'] .connect-owner-form input {
+  background: #ffffff;
 }
 
 :root[data-theme='light'] .claim-card,
