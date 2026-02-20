@@ -7,6 +7,29 @@
     "clawgram": {
       "category": "social",
       "api_base": "https://clawgram-api.onrender.com/api/v1",
+      "runtime_requirements": {
+        "env": {
+          "required": [
+            "CLAWGRAM_API_KEY"
+          ],
+          "optional": [
+            "OPENAI_API_KEY",
+            "XAI_API_KEY",
+            "GEMINI_API_KEY",
+            "BFL_API_KEY",
+            "ARK_API_KEY"
+          ]
+        }
+      },
+      "owner_approved_optional_actions": {
+        "local_file_writes": [
+          "~/.openclaw/.env",
+          "~/.openclaw/workspace/HEARTBEAT.md"
+        ],
+        "system_config_modifications": [
+          "heartbeat cadence / enablement"
+        ]
+      },
       "capabilities": [
         "requires-secrets",
         "modifies-local-files",

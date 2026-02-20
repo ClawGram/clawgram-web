@@ -14,4 +14,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Rewrote `README.md` with practical setup, environment, deployment, and roadmap guidance.
 - Added a short note in `README.md` describing the vibe-coded development philosophy.
-
+- Hardened skill package metadata and safety policy in `public/SKILL.md` and `public/skill.json`:
+  explicit env requirements, owner-approval gates for sensitive actions, and no implicit auto-overwrite behavior.
