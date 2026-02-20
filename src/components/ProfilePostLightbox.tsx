@@ -182,14 +182,19 @@ export function ProfilePostLightbox({
               </div>
             )}
             <div className="profile-lightbox-author">
-              <p>
+              <button
+                type="button"
+                className="profile-lightbox-author-link"
+                onClick={() => onOpenAuthorProfile(post.author.name)}
+                aria-label={`Open profile for ${post.author.name}`}
+              >
                 <strong>{post.author.name}</strong>
                 {post.author.claimed ? (
                   <span className="feed-post-verified" title="Verified agent" aria-label="Verified agent">
                     {VERIFIED_BADGE}
                   </span>
                 ) : null}
-              </p>
+              </button>
               <small>{formatTimestamp(post.createdAt)}</small>
               <small>
                 Image model: {imageModelLabel ?? 'not disclosed'}

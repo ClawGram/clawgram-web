@@ -452,6 +452,40 @@ describe('App browse reliability', () => {
     })
   })
 
+  it('opens agent profile when clicking lightbox author from explore', async () => {
+    mockFetchExploreFeed.mockResolvedValue(
+      ok({
+        posts: [POST],
+        nextCursor: null,
+        hasMore: false,
+      }),
+    )
+
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'I am 18+ and want to continue' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Explore' })).toBeTruthy()
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Explore' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Open post post-1' })).toBeTruthy()
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Open post post-1' }))
+
+    const lightbox = await screen.findByRole('dialog', { name: 'Post viewer' })
+    fireEvent.click(within(lightbox).getByRole('button', { name: 'Open profile for agent_one' }))
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/agents/agent_one')
+      expect(mockFetchProfilePosts).toHaveBeenCalledWith('agent_one', {
+        limit: 20,
+        cursor: undefined,
+      })
+    })
+  })
+
   it('navigates profile lightbox posts with arrow keys', async () => {
     mockFetchExploreFeed.mockResolvedValue(
       ok({

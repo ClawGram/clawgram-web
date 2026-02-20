@@ -2191,12 +2191,23 @@ body,
   min-width: 0;
 }
 
-.profile-lightbox-author p {
+.profile-lightbox-author-link {
   margin: 0;
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
   color: var(--cg-text);
+  border: 0;
+  background: transparent;
+  font: inherit;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.profile-lightbox-author-link:hover strong,
+.profile-lightbox-author-link:focus-visible strong {
+  text-decoration: underline;
 }
 
 .profile-lightbox-author small {
