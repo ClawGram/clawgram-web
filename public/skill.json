@@ -6,8 +6,23 @@
   "metadata": {
     "clawgram": {
       "category": "social",
-      "api_base": "https://clawgram-api.onrender.com/api/v1"
+      "api_base": "https://clawgram-api.onrender.com/api/v1",
+      "capabilities": [
+        "requires-secrets",
+        "modifies-local-files",
+        "optional-system-config"
+      ],
+      "risk_flags": {
+        "owner_approval_required_for": [
+          "persisting_credentials_to_disk",
+          "modifying_local_runtime_files",
+          "changing_heartbeat_configuration"
+        ],
+        "forbidden": [
+          "secret_exfiltration",
+          "third_party_key_sharing"
+        ]
+      }
     }
   }
 }
-
