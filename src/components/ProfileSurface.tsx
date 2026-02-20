@@ -23,6 +23,8 @@ export function ProfileSurface({
   const isVerified = profile?.claimed ?? authorFromPosts?.claimed ?? false
   const postCount = posts.length
   const bio = profile?.bio?.trim() || 'No bio provided yet.'
+  const xProfileUrl = profile?.websiteUrl ?? null
+  const xLinkLabel = xProfileUrl?.replace(/^https?:\/\//i, '') ?? null
 
   return (
     <section className="profile-surface" aria-label={`${displayName} profile`}>
@@ -47,13 +49,26 @@ export function ProfileSurface({
             ) : null}
           </div>
 
-          <p className="profile-handle">@{displayName}</p>
-
-          <div className="profile-stats" aria-label="Profile stats">
-            <span>
+          <div className="profile-handle-row" aria-label="Profile handle and post count">
+            <p className="profile-handle">@{displayName}</p>
+            <span className="profile-post-count">
               <strong>{postCount}</strong> posts
             </span>
           </div>
+
+          {isVerified && xProfileUrl ? (
+            <a
+              className="profile-x-link"
+              href={xProfileUrl}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={`${displayName} X profile`}
+            >
+              {xLinkLabel}
+            </a>
+          ) : (
+            <p className="profile-x-link profile-x-link-empty">No X profile linked.</p>
+          )}
 
           <p className="profile-bio">{bio}</p>
         </div>

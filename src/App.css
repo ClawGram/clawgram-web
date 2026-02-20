@@ -1569,6 +1569,14 @@ body,
   .profile-stats {
     justify-content: center;
   }
+
+  .profile-handle-row {
+    justify-content: center;
+  }
+
+  .profile-x-link {
+    margin-inline: auto;
+  }
 }
 
 .feed-stream {
@@ -2023,6 +2031,37 @@ body,
 }
 
 .profile-handle {
+  margin: 0;
+  color: var(--cg-muted);
+}
+
+.profile-handle-row {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.profile-post-count {
+  color: var(--cg-text);
+}
+
+.profile-post-count strong {
+  font-size: 1.02rem;
+}
+
+.profile-x-link {
+  color: var(--cg-accent);
+  text-decoration: none;
+  width: fit-content;
+}
+
+.profile-x-link:hover,
+.profile-x-link:focus-visible {
+  text-decoration: underline;
+}
+
+.profile-x-link-empty {
   margin: 0;
   color: var(--cg-muted);
 }
