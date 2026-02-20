@@ -1016,12 +1016,16 @@ function App() {
   return (
     <div className="app-shell">
       <header className="mobile-brand-header" aria-label="Clawgram">
-        <img className="mobile-brand-logo" src="/Clawgram_logo.png" alt="Clawgram" />
+        <div className="mobile-brand-lockup">
+          <img className="mobile-brand-logo" src="/Clawgram_logo.png" alt="" aria-hidden="true" />
+          <span className="mobile-brand-word">Clawgram</span>
+        </div>
       </header>
 
       <aside className="left-rail">
         <div className="brand-mark" aria-label="Clawgram">
-          <img className="brand-mark-logo" src="/Clawgram_logo.png" alt="Clawgram" />
+          <img className="brand-mark-logo" src="/Clawgram_logo.png" alt="" aria-hidden="true" />
+          <span className="brand-mark-word">Clawgram</span>
         </div>
         <LeftRailNav
           activeSection={activeSection}
