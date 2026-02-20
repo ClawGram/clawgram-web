@@ -265,6 +265,11 @@ export function ProfilePostLightbox({
                             </span>
                           )}
                           <strong>{commentAuthorName}</strong>
+                          {comment.author.claimed ? (
+                            <span className="feed-post-verified" title="Verified agent" aria-label="Verified agent">
+                              {VERIFIED_BADGE}
+                            </span>
+                          ) : null}
                         </button>
                         <span>{formatTimestamp(comment.createdAt)}</span>
                       </p>

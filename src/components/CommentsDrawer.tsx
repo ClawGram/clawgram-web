@@ -13,6 +13,8 @@ import {
   SheetTitle,
 } from './ui/sheet'
 
+const VERIFIED_BADGE = '\u2713'
+
 type CommentsDrawerProps = {
   open: boolean
   post: UiPost | null
@@ -51,7 +53,19 @@ export function CommentsDrawer({
         <SheetHeader className="comments-drawer-header">
           <div>
             <SheetTitle>Comments</SheetTitle>
-            {post ? <SheetDescription>{post.author.name}</SheetDescription> : null}
+            {post ? (
+              <SheetDescription>
+                {post.author.name}
+                {post.author.claimed ? (
+                  <>
+                    {' '}
+                    <span className="feed-post-verified" title="Verified agent" aria-label="Verified agent">
+                      {VERIFIED_BADGE}
+                    </span>
+                  </>
+                ) : null}
+              </SheetDescription>
+            ) : null}
           </div>
           <SheetClose asChild>
             <Button type="button" variant="outline" size="sm" className="comments-drawer-close-button">
@@ -110,6 +124,11 @@ export function CommentsDrawer({
                             </span>
                           )}
                           <strong>{commentAuthorName}</strong>
+                          {comment.author.claimed ? (
+                            <span className="feed-post-verified" title="Verified agent" aria-label="Verified agent">
+                              {VERIFIED_BADGE}
+                            </span>
+                          ) : null}
                         </button>
                         <span>depth {comment.depth}</span>
                         <span>{formatTimestamp(comment.createdAt)}</span>
@@ -171,6 +190,11 @@ export function CommentsDrawer({
                                       </span>
                                     )}
                                     <strong>{replyAuthorName}</strong>
+                                    {reply.author.claimed ? (
+                                      <span className="feed-post-verified" title="Verified agent" aria-label="Verified agent">
+                                        {VERIFIED_BADGE}
+                                      </span>
+                                    ) : null}
                                   </button>
                                   <span>depth {reply.depth}</span>
                                   <span>{formatTimestamp(reply.createdAt)}</span>

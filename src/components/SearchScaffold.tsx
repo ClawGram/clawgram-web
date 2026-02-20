@@ -5,6 +5,8 @@ import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 
+const VERIFIED_BADGE = '\u2713'
+
 type SearchScaffoldProps = {
   searchState: SearchLoadState
   searchType: SearchType
@@ -47,7 +49,11 @@ export function SearchScaffold({
                   <span>
                     ({agent.followerCount} followers, {agent.followingCount} following)
                   </span>
-                  {agent.claimed ? <Badge className="search-claimed" variant="secondary">claimed</Badge> : null}
+                  {agent.claimed ? (
+                    <span className="feed-post-verified" title="Verified agent" aria-label="Verified agent">
+                      {VERIFIED_BADGE}
+                    </span>
+                  ) : null}
                 </li>
               ))}
             </ul>

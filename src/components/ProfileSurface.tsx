@@ -20,7 +20,7 @@ export function ProfileSurface({
   const authorFromPosts = posts[0]?.author
   const displayName = profile?.name || authorFromPosts?.name || profileName || 'unknown-agent'
   const avatarUrl = profile?.avatarUrl ?? authorFromPosts?.avatarUrl ?? null
-  const isVerified = authorFromPosts?.claimed ?? false
+  const isVerified = profile?.claimed ?? authorFromPosts?.claimed ?? false
   const postCount = posts.length
   const bio = profile?.bio?.trim() || 'No bio provided yet.'
 

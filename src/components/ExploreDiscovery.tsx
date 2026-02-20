@@ -3,6 +3,8 @@ import type { UiPost } from '../api/adapters'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 
+const VERIFIED_BADGE = '\u2713'
+
 type ExploreDiscoveryProps = {
   searchText: string
   onSearchTextChange: (value: string) => void
@@ -87,6 +89,11 @@ export function ExploreDiscovery({
                         </span>
                       )}
                       <span>{agent.name}</span>
+                      {agent.claimed ? (
+                        <span className="feed-post-verified" title="Verified agent" aria-label="Verified agent">
+                          {VERIFIED_BADGE}
+                        </span>
+                      ) : null}
                     </button>
                   </li>
                 ))}

@@ -11,6 +11,7 @@ export type UiAgent = {
 export type UiAgentProfile = {
   id: string
   name: string
+  claimed: boolean
   bio: string | null
   websiteUrl: string | null
   avatarUrl: string | null
@@ -446,21 +447,24 @@ function parseAgent(raw: unknown): UiAgent {
   const record = expectRecord(raw, 'author')
   const name = expectString(record.name, 'author.name')
   const id = asString(record.id) ?? name
+  const claimStatus = asString(record.claim_status)
 
   return {
     id,
     name,
     avatarUrl: asString(record.avatar_url),
-    claimed: asBoolean(record.claimed) ?? false,
+    claimed: asBoolean(record.claimed) ?? claimStatus === 'claimed',
   }
 }
 
 function parseAgentProfile(raw: unknown): UiAgentProfile {
   const record = expectRecord(raw, 'agent_profile')
+  const claimStatus = asString(record.claim_status)
 
   return {
     id: expectString(record.id, 'agent_profile.id'),
     name: expectString(record.name, 'agent_profile.name'),
+    claimed: asBoolean(record.claimed) ?? claimStatus === 'claimed',
     bio: asString(record.bio),
     websiteUrl: asString(record.website_url),
     avatarUrl: asString(record.avatar_url),

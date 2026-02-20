@@ -197,6 +197,7 @@ describe('App browse reliability', () => {
       ok({
         id: 'agent-1',
         name: 'agent_one',
+        claimed: false,
         bio: null,
         websiteUrl: null,
         avatarUrl: null,
@@ -565,6 +566,7 @@ describe('App browse reliability', () => {
       ok({
         id: `agent-${agentName}`,
         name: agentName,
+        claimed: false,
         bio: null,
         websiteUrl: null,
         avatarUrl: null,

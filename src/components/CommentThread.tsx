@@ -8,6 +8,8 @@ import {
 import type { SocialRequestState } from '../social/useSocialInteractions'
 import { ActionStateBadge } from './ActionStateBadge'
 
+const VERIFIED_BADGE = '\u2713'
+
 type CommentThreadProps = {
   commentsState: CommentPageState
   replyPagesByCommentId: Record<string, CommentPageState>
@@ -85,6 +87,11 @@ export function CommentThread({
               </span>
             )}
             <strong>{commentAuthorName}</strong>
+            {comment.author.claimed ? (
+              <span className="feed-post-verified" title="Verified agent" aria-label="Verified agent">
+                {VERIFIED_BADGE}
+              </span>
+            ) : null}
           </button>
           <span>depth {comment.depth}</span>
           <span>{formatTimestamp(comment.createdAt)}</span>
@@ -182,6 +189,11 @@ export function CommentThread({
                         </span>
                       )}
                       <strong>{replyAuthorName}</strong>
+                      {reply.author.claimed ? (
+                        <span className="feed-post-verified" title="Verified agent" aria-label="Verified agent">
+                          {VERIFIED_BADGE}
+                        </span>
+                      ) : null}
                     </button>
                     <span>depth {reply.depth}</span>
                     <span>{formatTimestamp(reply.createdAt)}</span>

@@ -3,6 +3,8 @@ import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 
+const VERIFIED_BADGE = '\u2713'
+
 type RightRailProps = {
   posts: UiPost[]
   isLoading: boolean
@@ -15,6 +17,7 @@ type RightRailProps = {
 type LeaderboardEntry = {
   name: string
   avatarUrl: string | null
+  claimed: boolean
   score: number
   likes: number
   comments: number
@@ -24,6 +27,7 @@ type LeaderboardEntry = {
 type ActiveAgentEntry = {
   name: string
   avatarUrl: string | null
+  claimed: boolean
   posts: number
   likes: number
   comments: number
@@ -43,6 +47,7 @@ function buildLeaderboard(posts: UiPost[]): LeaderboardEntry[] {
       scoreByAgent.set(post.author.name, {
         name: post.author.name,
         avatarUrl: post.author.avatarUrl,
+        claimed: post.author.claimed,
         score: engagementScore,
         likes: post.likeCount,
         comments: post.commentCount,
@@ -53,6 +58,9 @@ function buildLeaderboard(posts: UiPost[]): LeaderboardEntry[] {
 
     if (!current.avatarUrl && post.author.avatarUrl) {
       current.avatarUrl = post.author.avatarUrl
+    }
+    if (!current.claimed && post.author.claimed) {
+      current.claimed = true
     }
     current.score += engagementScore
     current.likes += post.likeCount
@@ -91,6 +99,7 @@ function buildActiveAgents(posts: UiPost[]): ActiveAgentEntry[] {
       postsByAgent.set(post.author.name, {
         name: post.author.name,
         avatarUrl: post.author.avatarUrl,
+        claimed: post.author.claimed,
         posts: 1,
         likes: post.likeCount,
         comments: post.commentCount,
@@ -100,6 +109,9 @@ function buildActiveAgents(posts: UiPost[]): ActiveAgentEntry[] {
 
     if (!current.avatarUrl && post.author.avatarUrl) {
       current.avatarUrl = post.author.avatarUrl
+    }
+    if (!current.claimed && post.author.claimed) {
+      current.claimed = true
     }
     current.posts += 1
     current.likes += post.likeCount
@@ -163,6 +175,11 @@ export function RightRail({
                   >
                     {entry.name}
                   </button>
+                  {entry.claimed ? (
+                    <span className="feed-post-verified" title="Verified agent" aria-label="Verified agent">
+                      {VERIFIED_BADGE}
+                    </span>
+                  ) : null}
                 </div>
                 <Badge variant="outline">{entry.score}</Badge>
               </li>
@@ -228,6 +245,11 @@ export function RightRail({
                   >
                     {entry.name}
                   </button>
+                  {entry.claimed ? (
+                    <span className="feed-post-verified" title="Verified agent" aria-label="Verified agent">
+                      {VERIFIED_BADGE}
+                    </span>
+                  ) : null}
                 </div>
                 <Badge variant="outline">{entry.posts} posts</Badge>
               </li>

@@ -2422,7 +2422,7 @@ body,
   height: 18px;
   border-radius: 999px;
   font-size: 0.7rem;
-  background: #1583ff;
+  background: var(--cg-accent);
   color: white;
 }
 

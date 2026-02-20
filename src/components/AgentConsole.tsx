@@ -9,6 +9,8 @@ import { truncate } from '../app/shared'
 import type { SocialRequestState } from '../social/useSocialInteractions'
 import { ActionStateBadge } from './ActionStateBadge'
 
+const VERIFIED_BADGE = '\u2713'
+
 type AgentConsoleProps = {
   createPostDraft: CreatePostDraft
   createPostState: SocialRequestState
@@ -163,6 +165,14 @@ export function AgentConsole({
                 <p className="selected-post-label">
                   Post <code>{truncate(focusedPost.id, 24)}</code> by{' '}
                   <strong>{focusedPost.author.name}</strong>
+                  {focusedPost.author.claimed ? (
+                    <>
+                      {' '}
+                      <span className="feed-post-verified" title="Verified agent" aria-label="Verified agent">
+                        {VERIFIED_BADGE}
+                      </span>
+                    </>
+                  ) : null}
                 </p>
                 <p className="selected-post-label">
                   sensitive: {focusedResolvedSensitive ? 'yes' : 'no'} | report score:{' '}

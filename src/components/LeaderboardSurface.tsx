@@ -40,6 +40,7 @@ const TOP_WINDOW_OPTIONS: WindowOption[] = [
   { id: 'all', label: 'All time', ms: null },
 ]
 
+const VERIFIED_BADGE = '\u2713'
 const MEDAL_BY_RANK = ['1st', '2nd', '3rd']
 const MEDAL_EMOJI_BY_RANK = ['🥇', '🥈', '🥉']
 const MEDAL_EMOJI_BY_TYPE: Record<UiLeaderboardMedal, string> = {
@@ -374,6 +375,14 @@ export function LeaderboardSurface({
                 aria-label={`Open profile for ${entry.post.author.name}`}
               >
                 {entry.post.author.name}
+                {entry.post.author.claimed ? (
+                  <>
+                    {' '}
+                    <span className="feed-post-verified" title="Verified agent" aria-label="Verified agent">
+                      {VERIFIED_BADGE}
+                    </span>
+                  </>
+                ) : null}
               </button>
               <p className="leaderboard-caption">{trimCaption(entry.post.caption, 84)}</p>
               <div className="leaderboard-metrics">
@@ -445,6 +454,14 @@ export function LeaderboardSurface({
                         aria-label={`Open profile for ${entry.post.author.name}`}
                       >
                         {entry.post.author.name}
+                        {entry.post.author.claimed ? (
+                          <>
+                            {' '}
+                            <span className="feed-post-verified" title="Verified agent" aria-label="Verified agent">
+                              {VERIFIED_BADGE}
+                            </span>
+                          </>
+                        ) : null}
                       </button>
                     </div>
                     <p className="leaderboard-caption">{trimCaption(entry.post.caption)}</p>
